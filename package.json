@@ -1,0 +1,15 @@
+{
+  "name": "asistente-reuniones",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "start": "node --env-file=.env server.js",
+    "eval": "node --env-file=.env eval.mjs",
+    "test": "node test/e2e.mjs"
+  },
+  "devDependencies": {
+    "@soniox/client": "2.4.0",
+    "playwright": "1.63.0"
+  }
+}

@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Asistente de reuniones — prueba</title>
+<style>
+  body { font: 18px/1.5 system-ui, sans-serif; max-width: 760px; margin: 2rem auto; padding: 0 16px; color: #1a1a1a; background: #fff; }
+  body.alarma { background: #c62828; }
+  button { font: inherit; padding: .6rem 1.4rem; border-radius: 8px; border: 1px solid #888; cursor: pointer; }
+  #empezar { background: #1b5e20; color: #fff; border: 0; }
+  #texto { min-height: 6rem; padding: 1rem; background: #f3f3f3; border-radius: 8px; white-space: pre-wrap; }
+  #aviso { margin: 1rem 0; padding: 1.5rem; border-radius: 12px; background: #fff3cd; border: 3px solid #e65100; font-size: 1.4rem; }
+  #aviso button { background: #e65100; color: #fff; border: 0; margin-left: 1rem; }
+  #contadores, #resumen { color: #555; font-size: .9rem; }
+</style>
+</head>
+<body>
+<h1>Prueba del detector de vueltas</h1>
+<p>
+  <button id="empezar">Empezar reunión</button>
+  <button id="terminar" hidden>Terminar</button>
+  <span id="estado"></span>
+</p>
+<div id="aviso" hidden>
+  Estáis dando vueltas a <strong id="tema"></strong>. Alarma en <strong id="segundos"></strong> s
+  <button id="cancelar">Cancelar</button>
+</div>
+<div id="texto"></div>
+<p id="contadores"></p>
+<p id="resumen"></p>
+
+<script type="module">
+import { SonioxClient } from 'https://cdn.jsdelivr.net/npm/@soniox/client@2.4.0/dist/index.mjs';
+
+const VENTANA_MS = 60_000; // «dar vueltas» = 1 minuto repitiendo sin dato nuevo ni decisión (DECISIONES.md)
+const CADA_MS = 30_000;    // cada cuánto se consulta al detector
+const PREAVISO_S = 5;      // segundos que tiene el organizador para cancelar
+
+const $ = (id) => document.getElementById(id);
+let grabacion, consultas, audio, preaviso, inicio, desde, ocupado = false, frases = [];
+const cuenta = { consultas: 0, preavisos: 0, cancelados: 0, alarmas: 0, errores: 0, tokensEntrada: 0, tokensSalida: 0 };
+
+const texto = (filtro) => frases.filter(filtro).map((f) => f.texto).join('');
+const pintar = () => ($('contadores').textContent = Object.entries(cuenta).map(([k, v]) => `${k}: ${v}`).join(' · '));
+
+$('empezar').onclick = () => {
+  audio = new AudioContext();
+  navigator.wakeLock?.request('screen').catch(() => {});
+  const cliente = new SonioxClient({ config: async () => (await fetch('/api/soniox-key', { method: 'POST' })).json() });
+  grabacion = cliente.realtime.record({ model: 'stt-rt-v5', language_hints: ['es'], auto_reconnect: true });
+  grabacion.on('result', ({ tokens }) => {
+    const final = tokens.filter((t) => t.is_final).map((t) => t.text).join('');
+    if (final) frases.push({ t: Date.now(), texto: final });
+    $('texto').textContent = (texto(() => true) + tokens.filter((t) => !t.is_final).map((t) => t.text).join('')).slice(-400);
+  });
+  grabacion.on('state_change', ({ new_state }) => ($('estado').textContent = new_state));
+  grabacion.on('error', (e) => ($('estado').textContent = `Error: ${e.message}`));
+  inicio = desde = Date.now();
+  consultas = setInterval(comprobar, CADA_MS);
+  $('empezar').hidden = true;
+  $('terminar').hidden = false;
+  $('resumen').textContent = '';
+  pintar();
+};
+
+// Solo se consulta cuando hay un minuto completo de conversación desde el inicio o desde el último aviso.
+async function comprobar() {
+  const corte = Date.now() - VENTANA_MS;
+  if (ocupado || preaviso || corte < desde) return;
+  const ultimo = texto((f) => f.t >= corte);
+  if (!ultimo.trim()) return;
+  ocupado = true;
+  try {
+    const r = await (await fetch('/api/vueltas', { method: 'POST', body: JSON.stringify({ antes: texto((f) => f.t < corte), ultimo }) })).json();
+    cuenta.consultas++;
+    cuenta.tokensEntrada += r.uso.input_tokens;
+    cuenta.tokensSalida += r.uso.output_tokens;
+    if (r.vueltas && grabacion) avisar(r.tema);
+  } catch {
+    cuenta.errores++;
+  } finally {
+    ocupado = false;
+    pintar();
+  }
+}
+
+function avisar(tema) {
+  cuenta.preavisos++;
+  let s = PREAVISO_S;
+  $('tema').textContent = tema || 'el mismo tema';
+  $('aviso').hidden = false;
+  const tic = () => { $('segundos').textContent = s; if (s-- === 0) cerrarAviso(true); };
+  tic();
+  preaviso = setInterval(tic, 1000);
+}
+
+function cerrarAviso(sonar) {
+  clearInterval(preaviso);
+  preaviso = null;
+  $('aviso').hidden = true;
+  desde = Date.now();
+  if (sonar) { cuenta.alarmas++; pitar(); } else cuenta.cancelados++;
+  pintar();
+}
+$('cancelar').onclick = () => cerrarAviso(false);
+
+function pitar() {
+  document.body.classList.add('alarma');
+  setTimeout(() => document.body.classList.remove('alarma'), 3000);
+  for (let i = 0; i < 3; i++) {
+    const tono = audio.createOscillator();
+    tono.type = 'square';
+    tono.frequency.value = 880;
+    tono.connect(audio.destination);
+    tono.start(audio.currentTime + i * 0.4);
+    tono.stop(audio.currentTime + i * 0.4 + 0.25);
+  }
+}
+
+// Al terminar se borra la transcripción: solo quedan los contadores en pantalla.
+$('terminar').onclick = async () => {
+  clearInterval(consultas);
+  if (preaviso) { clearInterval(preaviso); preaviso = null; $('aviso').hidden = true; }
+  const g = grabacion;
+  grabacion = null;
+  await g.stop();
+  frases = [];
+  $('texto').textContent = '';
+  $('estado').textContent = '';
+  $('resumen').textContent = `Reunión terminada: ${((Date.now() - inicio) / 60000).toFixed(1)} min. Transcripción borrada.`;
+  $('terminar').hidden = true;
+  $('empezar').hidden = false;
+};
+</script>
+</body>
+</html>

@@ -1,0 +1,122 @@
+[
+  {
+    "id": "v01-presupuesto-canales",
+    "vueltas": true,
+    "antes": "Bueno, el siguiente punto es el reparto del presupuesto de la campaña de Navidad. Yo pondría la mayor parte en Meta porque el año pasado nos funcionó muy bien en conversión. Ya, pero en Google captamos a la gente que ya está buscando el producto, eso es demanda real. Meta nos da volumen y es más barato por clic. Sí, pero el cliente de Google compra más. Bueno, yo sigo pensando que Meta convierte mejor.",
+    "ultimo": "A ver, es que Meta el año pasado funcionó muy bien, convirtió muy bien. Ya, pero insisto en que en Google la gente ya está buscando, es demanda real. Pero Meta es más barato por clic, nos da más volumen. Y el de Google compra más, eso lo hemos visto. Yo sigo con que Meta convierte mejor. Pues yo creo que Google es más seguro."
+  },
+  {
+    "id": "v02-fecha-lanzamiento",
+    "vueltas": true,
+    "antes": "Lo siguiente es la fecha de lanzamiento de la app. Desarrollo dice que no llegamos al quince de noviembre porque faltan las pruebas de pago. Marketing ya ha comprometido la fecha con los medios. Si lanzamos sin probar los pagos nos arriesgamos a errores. Y si retrasamos quedamos mal con los medios.",
+    "ultimo": "Es que no llegamos, faltan las pruebas de pago, no podemos lanzar así. Ya, pero la fecha está comprometida con los medios. Si lanzamos sin probar los pagos va a haber errores. Y si lo retrasamos quedamos fatal con los medios. Pues no llegamos, de verdad. Pero es que está comprometido."
+  },
+  {
+    "id": "v03-cliente-precio",
+    "vueltas": true,
+    "antes": "Os presento la propuesta: el rediseño de la web son doce mil euros e incluye diez páginas y la tienda. Nos parece caro, otro proveedor nos lo hace por menos. Entiendo, pero nuestro precio incluye el mantenimiento del primer año. Aun así se nos va de presupuesto. Podemos ajustar algo quitando alguna página.",
+    "ultimo": "Es que de verdad se nos va de presupuesto, es caro. Ya, pero tened en cuenta que incluye el mantenimiento del primer año. El otro proveedor nos lo deja por menos. Ya os digo que podemos quitar alguna página para ajustarlo. Sí, pero sigue siendo caro para nosotros. El mantenimiento del primer año está incluido, eso hay que valorarlo."
+  },
+  {
+    "id": "v04-perfil-vacante",
+    "vueltas": true,
+    "antes": "Tenemos que decidir el perfil de la vacante de analista. Yo prefiero un senior porque no tenemos tiempo de formar a nadie. Un junior nos sale mucho más barato y lo formamos a nuestra manera. El senior empieza a rendir desde el primer día. El junior se queda más tiempo en la empresa.",
+    "ultimo": "Yo insisto en el senior, no tenemos tiempo para formar a nadie. Pero el junior es mucho más barato y lo formamos como queremos. El senior rinde desde el primer día, eso es clave. Y el junior suele quedarse más tiempo. Ya, pero formar lleva tiempo y no lo tenemos. Ya, pero cuesta menos."
+  },
+  {
+    "id": "v05-color-boton",
+    "vueltas": true,
+    "antes": "Vamos con el diseño de la página de registro. El botón principal yo lo pondría en verde, se asocia a continuar. El naranja destaca más sobre el fondo blanco. Verde es el color de nuestra marca. Pero el naranja llama más la atención.",
+    "ultimo": "Yo lo veo en verde, es el color de la marca y se asocia a continuar. El naranja destaca más sobre el blanco, se ve más. Ya, pero el verde es nuestra marca. Y el naranja llama más la atención, eso está claro. Pues yo sigo con el verde. Y yo con el naranja."
+  },
+  {
+    "id": "v06-proveedor-logistica",
+    "vueltas": true,
+    "antes": "Punto cuatro, el proveedor de logística. Este mes ha habido tres retrasos en entregas y dos quejas de clientes. Cambiar de proveedor ahora en plena campaña es un riesgo. Pero si seguimos así perdemos clientes. El contrato además termina en marzo.",
+    "ultimo": "Es que ha habido tres retrasos este mes, y las quejas. Ya, pero cambiar ahora en plena campaña es arriesgado. Si seguimos así vamos a perder clientes. El contrato acaba en marzo, igual hay que aguantar. Pero tres retrasos en un mes es mucho. Ya, pero cambiar en campaña es un riesgo."
+  },
+  {
+    "id": "v07-dias-oficina",
+    "vueltas": true,
+    "antes": "Hablemos de los días de oficina. Yo propongo tres días presenciales para que el equipo se vea más. Con dos días es suficiente, la gente valora mucho el teletrabajo. En remoto se pierde comunicación. Y con más días presenciales perdemos talento.",
+    "ultimo": "Yo sigo pensando que tres días, el equipo necesita verse. Con dos basta, la gente valora el teletrabajo. Es que en remoto se pierde mucha comunicación. Y si pedimos más días presenciales se nos va gente. Ya, pero la comunicación se resiente. Ya, pero el talento se va."
+  },
+  {
+    "id": "v08-nombre-producto-mismo-minuto",
+    "vueltas": true,
+    "antes": "Empezamos con el tema del nombre del producto nuevo. Hay dos propuestas, Lumen y Faro.",
+    "ultimo": "A mí me gusta Lumen, suena moderno. Faro es más nuestro, más cercano. Lumen suena moderno. Faro es más cercano. Ya, pero Lumen es más moderno. Y Faro más cercano. Lumen es moderno, de verdad. Faro es cercano."
+  },
+  {
+    "id": "v09-cliente-alcance",
+    "vueltas": true,
+    "antes": "Revisemos el alcance del proyecto de consultoría. El presupuesto cubre el análisis de procesos de dos departamentos. Nos gustaría incluir también el de compras. Eso supondría ampliar el presupuesto porque son más horas. Entendemos, pero pensábamos que entraba.",
+    "ultimo": "Es que nosotros pensábamos que compras entraba en el proyecto. El presupuesto cubre dos departamentos, compras serían más horas. Ya, pero lo entendimos así desde el principio. Si añadimos compras hay que ampliar el presupuesto. Nosotros creíamos que estaba incluido. Son más horas, por eso hay que ampliarlo."
+  },
+  {
+    "id": "v10-informe-direccion",
+    "vueltas": true,
+    "antes": "Sobre el informe mensual para dirección. Dirección está acostumbrada al Excel y lo maneja bien. Un dashboard se actualiza solo y nos ahorra horas. Pero montar el dashboard lleva tiempo. Y el Excel tiene errores al copiar datos a mano.",
+    "ultimo": "Dirección está acostumbrada al Excel, lo maneja bien. Ya, pero el dashboard se actualiza solo, nos ahorra horas cada mes. Montar el dashboard lleva su tiempo. Y en el Excel copiamos a mano y hay errores. Yo seguiría con el Excel porque lo conocen. Pues el dashboard ahorra horas."
+  },
+  {
+    "id": "n01-resumen-con-decision",
+    "vueltas": false,
+    "antes": "Bueno, el siguiente punto es el reparto del presupuesto de la campaña de Navidad. Yo pondría la mayor parte en Meta porque el año pasado nos funcionó muy bien en conversión. Ya, pero en Google captamos a la gente que ya está buscando el producto, eso es demanda real. Meta nos da volumen y es más barato por clic. Sí, pero el cliente de Google compra más. Bueno, yo sigo pensando que Meta convierte mejor.",
+    "ultimo": "Vale, resumiendo: Meta da volumen y convirtió bien el año pasado, Google capta demanda real. Propongo una cosa: sesenta por ciento a Meta y cuarenta a Google, y revisamos resultados en dos semanas. Me parece bien. De acuerdo. Pues decidido, sesenta cuarenta, y Laura prepara las campañas para el lunes."
+  },
+  {
+    "id": "n02-dato-nuevo",
+    "vueltas": false,
+    "antes": "Bueno, el siguiente punto es el reparto del presupuesto de la campaña de Navidad. Yo pondría la mayor parte en Meta porque el año pasado nos funcionó muy bien en conversión. Ya, pero en Google captamos a la gente que ya está buscando el producto, eso es demanda real. Meta nos da volumen y es más barato por clic. Sí, pero el cliente de Google compra más. Bueno, yo sigo pensando que Meta convierte mejor.",
+    "ultimo": "Esperad, acabo de mirar los datos de la campaña de septiembre. En Google el coste por venta fue de dieciocho euros y en Meta de veintinueve. Eso cambia las cosas, Meta tiene más volumen pero cada venta sale bastante más cara. Y el ticket medio en Google fue más alto también. Con esos números habría que replantear el reparto."
+  },
+  {
+    "id": "n03-cambio-de-tema",
+    "vueltas": false,
+    "antes": "Lo siguiente es la fecha de lanzamiento de la app. Desarrollo dice que no llegamos al quince de noviembre porque faltan las pruebas de pago. Marketing ya ha comprometido la fecha con los medios. Si lanzamos sin probar los pagos nos arriesgamos a errores. Y si retrasamos quedamos mal con los medios.",
+    "ultimo": "Vale, la fecha la cerramos el jueves con desarrollo cuando tengan las pruebas de pago. Pasamos al siguiente punto del orden del día, que es la contratación del nuevo diseñador. Hemos recibido catorce currículums y hemos preseleccionado cuatro. Las entrevistas serían la semana que viene, martes y miércoles."
+  },
+  {
+    "id": "n04-presentacion-inicial",
+    "vueltas": false,
+    "antes": "",
+    "ultimo": "Buenos días a todos, gracias por venir. El objetivo de hoy es decidir el plan de medios para el primer trimestre. Tenemos tres puntos: presupuesto total, reparto por canales y calendario. Empezamos por el presupuesto. Dirección ha aprobado ciento veinte mil euros para el trimestre, un diez por ciento más que el anterior."
+  },
+  {
+    "id": "n05-reparto-de-tareas",
+    "vueltas": false,
+    "antes": "Punto cuatro, el proveedor de logística. Este mes ha habido tres retrasos en entregas y dos quejas de clientes. Cambiar de proveedor ahora en plena campaña es un riesgo. Pero si seguimos así perdemos clientes. El contrato además termina en marzo.",
+    "ultimo": "Entonces quedamos así: Marta pide hoy mismo presupuesto a otros dos proveedores. Jorge revisa las penalizaciones del contrato actual por los retrasos y nos lo pasa el miércoles. Y el lunes que viene decidimos con los presupuestos delante. ¿Alguien tiene algo más sobre esto? Perfecto."
+  },
+  {
+    "id": "n06-pregunta-nueva",
+    "vueltas": false,
+    "antes": "Hablemos de los días de oficina. Yo propongo tres días presenciales para que el equipo se vea más. Con dos días es suficiente, la gente valora mucho el teletrabajo. En remoto se pierde comunicación. Y con más días presenciales perdemos talento.",
+    "ultimo": "Una pregunta que no hemos planteado: ¿qué dice la encuesta de clima que hicimos en junio sobre esto? Si no recuerdo mal había una pregunta sobre presencialidad. Y otra cosa, ¿los equipos de atención al cliente tendrían el mismo régimen o es distinto por los turnos? Eso habría que tenerlo en cuenta antes de decidir."
+  },
+  {
+    "id": "n07-opcion-nueva",
+    "vueltas": false,
+    "antes": "Vamos con el diseño de la página de registro. El botón principal yo lo pondría en verde, se asocia a continuar. El naranja destaca más sobre el fondo blanco. Verde es el color de nuestra marca. Pero el naranja llama más la atención.",
+    "ultimo": "¿Y si hacemos una prueba A/B? Ponemos la mitad del tráfico con el botón verde y la otra mitad con el naranja durante dos semanas y vemos cuál convierte más. Así no decidimos por gustos. La herramienta de pruebas ya la tenemos contratada, se monta en un día. Me parece buena idea, así lo dejamos en manos de los datos."
+  },
+  {
+    "id": "n08-cliente-contrapropuesta",
+    "vueltas": false,
+    "antes": "Os presento la propuesta: el rediseño de la web son doce mil euros e incluye diez páginas y la tienda. Nos parece caro, otro proveedor nos lo hace por menos. Entiendo, pero nuestro precio incluye el mantenimiento del primer año. Aun así se nos va de presupuesto. Podemos ajustar algo quitando alguna página.",
+    "ultimo": "Os hago una contrapropuesta: dejamos el rediseño en diez mil euros si reducimos a ocho páginas y el mantenimiento pasa a ser de seis meses en lugar de un año. Además os lo entregamos en seis semanas. Eso ya encaja mejor en nuestro presupuesto. Lo consulto con mi socio y os confirmo el viernes."
+  },
+  {
+    "id": "n09-lluvia-de-ideas",
+    "vueltas": false,
+    "antes": "Vamos a hacer una lluvia de ideas para la acción de verano.",
+    "ultimo": "Se me ocurre un sorteo en redes sociales entre quienes compartan una foto de vacaciones. Otra idea: una alianza con una cadena de heladerías, con un código de descuento en cada tarrina. También podríamos hacer un pódcast corto con consejos de viaje. ¿Y un mapa interactivo con planes por comunidad autónoma? O una colaboración con creadores de contenido de viajes."
+  },
+  {
+    "id": "n10-mismo-tema-con-avance",
+    "vueltas": false,
+    "antes": "Sobre el informe mensual para dirección. Dirección está acostumbrada al Excel y lo maneja bien. Un dashboard se actualiza solo y nos ahorra horas. Pero montar el dashboard lleva tiempo. Y el Excel tiene errores al copiar datos a mano.",
+    "ultimo": "He estado mirando opciones y el dashboard se puede montar con la herramienta que ya pagamos, sin coste extra. Lo que llevaría es conectar la base de datos de ventas, unas dos semanas de trabajo. Podríamos mantener el Excel en paralelo un mes para que dirección se acostumbre. ¿Os parece que lo probemos con el informe de diciembre?"
+  }
+]
