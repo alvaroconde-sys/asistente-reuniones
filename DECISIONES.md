@@ -69,4 +69,21 @@ Formato: decisión · alternativas descartadas · motivo. Lo que decide el CPO v
 - **Patrón del fallo:** el salto de tema se lee como si alguien hubiera propuesto pasar a otro punto, y lo toma por cierre del punto activo. Es un error silencioso: cambia de punto sin avisar.
 - **Cambio:** la definición de «cerrado» exige un cierre expreso. Empezar a hablar de otro asunto, aunque enlace con lo anterior, no cierra el punto. Se redacta sin copiar las frases de los casos, para no inflar la medición.
 - **Más casos:** 5 nuevos de otro punto y 5 de cambio legítimo, con otras frases, para tener 10 por tipo y vigilar que la regla más estricta no convierta cambios legítimos en avisos falsos. Total: 45.
+### Tercera medición y elección de modelo (24-oct, 12:28; 45 casos)
+- **Resultados:**
+
+  | Configuración | Vueltas | Otro punto | Fuera | Falsas alarmas | Cambio legítimo |
+  |---|---|---|---|---|---|
+  | Haiku sin pensar | 10/10 | 9/10 | 5/5 | 0/20 | 5/10 |
+  | Haiku pensando poco | 10/10 | 9/10 | 5/5 | 0/20 | 6/10 |
+  | Haiku pensando normal | 10/10 | 9/10 | 5/5 | 0/20 | 8/10 |
+  | Sonnet sin pensar | 10/10 | 10/10 | 5/5 | 0/20 | 10/10 |
+
+  Errores: 0 en las cuatro.
+- **Lectura:**
+  - La regla estricta de «cerrado» arregla los saltos a otro punto.
+  - En Haiku retrasa el reconocimiento de cambios legítimos: responde «nada» y se queda en el punto anterior, nunca da un aviso.
+  - Hipótesis no comprobada: lo corrige en la consulta siguiente. La medición mira cada caso por separado, no en secuencia.
+- **Coste por consulta** (tokens medidos × precios de Anthropic): Haiku normal ~0,00016 $; Sonnet ~0,0027 $. Esta medición costó ~0,14 $.
+- **Modelo para la prueba real: Sonnet sin pensar** (CPO). Descartado: Haiku pensando normal. Motivo: es la única configuración sin fallos. En el piloto el coste absoluto es pequeño, y así un fallo en la reunión real se podrá atribuir a la idea y no al modelo. Haiku queda como vía para abaratar cuando la idea esté validada.
 - **Riesgo abierto:** en los casos, «lo anterior» es corto. En una reunión real crece con cada minuto, y con él el coste de cada consulta. Se mide en la primera reunión real (la página muestra los tokens). Si hace falta, se aplica caché de prompt.

@@ -8,7 +8,7 @@ export const CONFIGS = {
   'haiku pensando normal': { model: 'claude-haiku-5-5' },
   'sonnet sin pensar': { model: 'claude-sonnet-5-5', thinking: { type: 'between_tools' }, output_config: { effort: 'low' } },
 };
-export const POR_DEFECTO = 'haiku pensando poco';
+export const POR_DEFECTO = 'sonnet sin pensar';
 
 const INSTRUCCIONES = `Eres el detector de una reunión presencial en español.
 Recibes el ORDEN DEL DÍA numerado, el PUNTO ACTIVO, la transcripción ANTERIOR y el ÚLTIMO MINUTO. Devuelve:

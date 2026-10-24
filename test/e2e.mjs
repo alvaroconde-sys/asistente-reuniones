@@ -103,7 +103,8 @@ assert.equal(await activo(), 'Responsables');
 
 // 8. La petición lleva el modelo, el orden del día, el punto activo, lo anterior y el último minuto.
 const ultima = peticionesClaude.at(-1);
-assert.equal(ultima.model, 'claude-haiku-5-5');
+assert.equal(ultima.model, 'claude-sonnet-5-5');
+assert.equal(ultima.thinking.type, 'between_tools');
 assert.equal(ultima.output_config.effort, 'low');
 assert.equal(ultima.output_config.format.type, 'json_schema');
 assert.match(ultima.messages[0].content, /^ORDEN DEL DÍA:\n1\. Presupuesto\n2\. Calendario\n3\. Responsables\n\nPUNTO ACTIVO: 3\n\nANTERIOR:\nBuenos días[\s\S]*\n\nÚLTIMO MINUTO:\nSeguimos hablando/);
