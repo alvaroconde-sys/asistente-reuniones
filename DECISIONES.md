@@ -102,3 +102,4 @@ Formato: decisión · alternativas descartadas · motivo. Lo que decide el CPO v
   - Del orden del día se quitan los guiones y la numeración que escriba el usuario.
 - **Coste:** hasta 360 consultas por hora. Al coste por consulta de la prueba, ~1,1 $/h; con consulta cada 15 s serían ~0,76 $/h. Pendiente de medir en una reunión real.
 - **Validez de los casos con ventana de 30 s:** el último tramo de los casos tiene 38–66 palabras (mediana 53). A 120–150 palabras/min de habla normal (Loperete 1984, citado en *Estudios de Fonética Experimental*, UB) son ~15–33 s. Es decir, los casos ya eran tramos de unos 30 s o menos.
+- **Nueva medición con «último tramo»** (CPO, 24-oct, 13:00; Sonnet sin pensar): 45/45 aciertos, 0/20 falsas alarmas y 0 errores. Respuesta media en 2,0 s, así que el peor caso queda en ~47 s. Tokens: 52149 de entrada y 1660 de salida, unos 0,12 $.
