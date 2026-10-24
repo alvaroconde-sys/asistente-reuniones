@@ -1,6 +1,14 @@
 // Detector: pregunta a Claude de qué punto del orden del día se habla en el último minuto
 // y si se está dando vueltas, y decide qué tiene que hacer la página.
-const MODELO = 'claude-haiku-5-5';
+
+// Configuraciones que compara `npm run eval`; la página usa POR_DEFECTO (DECISIONES.md).
+export const CONFIGS = {
+  'haiku sin pensar': { model: 'claude-haiku-5-5', thinking: { type: 'disabled' } },
+  'haiku pensando poco': { model: 'claude-haiku-5-5', output_config: { effort: 'low' } },
+  'haiku pensando normal': { model: 'claude-haiku-5-5' },
+  'sonnet sin pensar': { model: 'claude-sonnet-5-5', thinking: { type: 'between_tools' }, output_config: { effort: 'low' } },
+};
+export const POR_DEFECTO = 'haiku pensando poco';
 
 const INSTRUCCIONES = `Eres el detector de una reunión presencial en español.
 Recibes el ORDEN DEL DÍA numerado, el PUNTO ACTIVO, la transcripción ANTERIOR y el ÚLTIMO MINUTO. Devuelve:
@@ -8,10 +16,21 @@ Recibes el ORDEN DEL DÍA numerado, el PUNTO ACTIVO, la transcripción ANTERIOR 
 - "cerrado": true si, antes de pasar a ese punto, el punto activo quedó cerrado: se tomó una decisión, se acordó dejarlo para más tarde o alguien propuso pasar a otro punto. false en otro caso.
 - "vueltas": true si en el último minuto se repiten argumentos, propuestas o preguntas que ya aparecen antes (o dentro del propio minuto) sin aportar ningún dato nuevo, sin avanzar hacia una decisión y sin tomarla. No son vueltas: la presentación inicial de un tema, un dato nuevo, una pregunta nueva, una opción nueva ni un resumen que acaba en una decisión o en un reparto de tareas. Ante la duda, false.
 - "tema": si "punto" es 0, el asunto ajeno al orden del día; si hay vueltas, lo que se repite; 8 palabras como máximo, o vacío.
-Analiza solo el contenido; no juzgues a las personas ni sus emociones.
-Responde únicamente con JSON: {"punto": número, "cerrado": true o false, "vueltas": true o false, "tema": "texto"}`;
+Analiza solo el contenido; no juzgues a las personas ni sus emociones.`;
 
-export async function analizar({ orden, activo, antes, ultimo }) {
+// Salida estructurada: la API garantiza un JSON con este esquema.
+const FORMATO = {
+  type: 'json_schema',
+  schema: {
+    type: 'object',
+    properties: { punto: { type: 'integer' }, cerrado: { type: 'boolean' }, vueltas: { type: 'boolean' }, tema: { type: 'string' } },
+    required: ['punto', 'cerrado', 'vueltas', 'tema'],
+    additionalProperties: false,
+  },
+};
+
+export async function analizar({ orden, activo, antes, ultimo }, config = POR_DEFECTO) {
+  const { output_config, ...modelo } = CONFIGS[config];
   const contenido = [
     `ORDEN DEL DÍA:\n${orden.map((p, i) => `${i + 1}. ${p}`).join('\n')}`,
     `PUNTO ACTIVO: ${activo || 'ninguno todavía'}`,
@@ -25,20 +44,27 @@ export async function analizar({ orden, activo, antes, ultimo }) {
       'anthropic-version': '2023-06-01',
       'content-type': 'application/json',
     },
-    body: JSON.stringify({ model: MODELO, max_tokens: 100, system: INSTRUCCIONES, messages: [{ role: 'user', content: contenido }] }),
+    body: JSON.stringify({
+      ...modelo,
+      max_tokens: 2000, // el razonamiento cuenta dentro de este límite: tiene que caber con la respuesta
+      output_config: { ...output_config, format: FORMATO },
+      system: INSTRUCCIONES,
+      messages: [{ role: 'user', content: contenido }],
+    }),
   });
   if (!res.ok) throw new Error(`Claude ${res.status}: ${await res.text()}`);
   const datos = await res.json();
-  const r = JSON.parse(datos.content.map((b) => b.text ?? '').join('').match(/\{[\s\S]*\}/)?.[0] ?? '{}');
+  // Una respuesta cortada o rechazada es un error, no un «no pasa nada».
+  if (['max_tokens', 'refusal'].includes(datos.stop_reason)) throw new Error(`Respuesta incompleta: ${datos.stop_reason}`);
+  const r = JSON.parse(datos.content.find((b) => b.type === 'text').text);
 
-  // Un punto inexistente es una respuesta inválida: ante la duda, no se molesta a nadie.
   const valido = Number.isInteger(r.punto) && r.punto >= 0 && r.punto <= orden.length;
   const accion =
     !valido ? 'nada'
     : r.punto === 0 ? 'fuera del orden del día'
-    : r.punto !== activo ? (r.cerrado === true || !activo ? 'cambio de punto' : 'otro punto')
-    : r.vueltas === true ? 'vueltas'
+    : r.punto !== activo ? (r.cerrado || !activo ? 'cambio de punto' : 'otro punto')
+    : r.vueltas ? 'vueltas'
     : 'nada';
-  const tema = accion === 'cambio de punto' || accion === 'otro punto' ? orden[r.punto - 1] : String(r.tema ?? '');
+  const tema = accion === 'cambio de punto' || accion === 'otro punto' ? orden[r.punto - 1] : r.tema;
   return { accion, punto: valido ? r.punto : activo, tema, uso: datos.usage };
 }

@@ -33,7 +33,14 @@ No hace falta `npm install` para usarlo: la página carga el SDK de Soniox desde
 - 5 de cambios de punto legítimos;
 - 10 en los que no debe pasar nada.
 
-Muestra los aciertos por tipo y las falsas alarmas (avisos en casos donde no tocaba avisar). Cada caso indica su orden del día (de los 7 inventados al principio del fichero), el punto activo, lo dicho antes, el último minuto y la acción esperada.
+Lo hace en las 4 configuraciones de `detector.mjs` (Haiku sin pensar, Haiku pensando poco, Haiku pensando normal y Sonnet sin pensar). De cada una muestra:
+- los casos que falla;
+- los aciertos por tipo;
+- las falsas alarmas (avisos en casos donde no tocaba avisar);
+- los errores (respuestas cortadas o no válidas);
+- los tokens y el tiempo medio por consulta.
+
+Cada caso indica su orden del día (de los 7 inventados al principio del fichero), el punto activo, lo dicho antes, el último minuto y la acción esperada.
 
 ## Pruebas (desarrollo)
 

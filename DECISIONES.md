@@ -50,3 +50,12 @@ Formato: decisión · alternativas descartadas · motivo. Lo que decide el CPO v
 - **Si la IA responde un punto que no existe, no se hace nada.** Descartado: avisar. Motivo: ante la duda, no molestar.
 - **Registro de avisos en pantalla** (hora, tipo, tema y resultado). Sirve para revisar qué avisos eran falsos. No se guarda: desaparece al cerrar la pestaña. La transcripción se sigue borrando al terminar.
 - **35 casos de prueba sobre 7 órdenes del día inventados:** 10 de vueltas, 5 de otro punto, 5 fuera del orden del día, 5 cambios legítimos y 10 sin aviso. Los 20 casos anteriores se mantienen, con orden del día y punto activo añadidos.
+
+### Corrección tras la primera medición real (24-oct, 12:01)
+- **Resultado** (medición del CPO, 24-oct): vueltas 0/10, otro punto 0/5, fuera 0/5. Tokens de salida: 3418 en 35 consultas.
+- **Causa:** Haiku 5.5 piensa por defecto y ese razonamiento cuenta dentro de `max_tokens` (documentación de Claude, 24-oct). Con el límite en 100, la respuesta salía cortada. Además, el código tomaba una respuesta no válida por «nada», así que el fallo pasó por un acierto: los resultados «nada 10/10» y «0 falsas alarmas» de esa medición no valen.
+- **Arreglo:**
+  - `max_tokens` a 2000. Es un límite, no un gasto.
+  - Salida estructurada con esquema JSON (`output_config.format`), que la API garantiza y que admite Haiku 5.5.
+  - Una respuesta cortada, rechazada o que no es JSON se cuenta como error, no como «nada».
+- **El razonamiento se decide midiendo.** `npm run eval` compara 4 configuraciones y la página usa `POR_DEFECTO` (de momento, Haiku pensando poco) hasta tener datos. Criterio: la más barata y rápida que cumpla los umbrales.
