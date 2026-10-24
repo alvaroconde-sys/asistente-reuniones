@@ -8,43 +8,77 @@
   body { font: 18px/1.5 system-ui, sans-serif; max-width: 760px; margin: 2rem auto; padding: 0 16px; color: #1a1a1a; background: #fff; }
   body.alarma { background: #c62828; }
   button { font: inherit; padding: .6rem 1.4rem; border-radius: 8px; border: 1px solid #888; cursor: pointer; }
+  textarea { font: inherit; width: 100%; box-sizing: border-box; }
   #empezar { background: #1b5e20; color: #fff; border: 0; }
+  #puntos li { cursor: pointer; }
+  #puntos li.activo { font-weight: bold; color: #1b5e20; }
   #texto { min-height: 6rem; padding: 1rem; background: #f3f3f3; border-radius: 8px; white-space: pre-wrap; }
   #aviso { margin: 1rem 0; padding: 1.5rem; border-radius: 12px; background: #fff3cd; border: 3px solid #e65100; font-size: 1.4rem; }
-  #aviso button { background: #e65100; color: #fff; border: 0; margin-left: 1rem; }
-  #contadores, #resumen { color: #555; font-size: .9rem; }
+  #aviso button { background: #e65100; color: #fff; border: 0; margin: .5rem .5rem 0 0; }
+  #eventos, #contadores, #resumen { color: #555; font-size: .9rem; }
 </style>
 </head>
 <body>
-<h1>Prueba del detector de vueltas</h1>
+<h1>Prueba del detector</h1>
+<label id="preparar">Orden del día, un punto por línea
+  <textarea id="orden" rows="5"></textarea>
+</label>
 <p>
   <button id="empezar">Empezar reunión</button>
+  <button id="noAviso" hidden>No ha avisado</button>
   <button id="terminar" hidden>Terminar</button>
   <span id="estado"></span>
 </p>
+<ol id="puntos" title="Pulsa un punto para corregir el punto activo"></ol>
 <div id="aviso" hidden>
-  Estáis dando vueltas a <strong id="tema"></strong>. Alarma en <strong id="segundos"></strong> s
+  <span id="mensaje"></span>. Alarma en <strong id="segundos"></strong> s<br>
   <button id="cancelar">Cancelar</button>
+  <button id="irPunto"></button>
 </div>
 <div id="texto"></div>
+<ul id="eventos"></ul>
 <p id="contadores"></p>
 <p id="resumen"></p>
 
 <script type="module">
 import { SonioxClient } from 'https://cdn.jsdelivr.net/npm/@soniox/client@2.4.0/dist/index.mjs';
 
-const VENTANA_MS = 60_000; // «dar vueltas» = 1 minuto repitiendo sin dato nuevo ni decisión (DECISIONES.md)
+const VENTANA_MS = 60_000; // 1 minuto de vueltas o fuera del punto antes de avisar (DECISIONES.md)
 const CADA_MS = 30_000;    // cada cuánto se consulta al detector
 const PREAVISO_S = 5;      // segundos que tiene el organizador para cancelar
 
 const $ = (id) => document.getElementById(id);
-let grabacion, consultas, audio, preaviso, inicio, desde, ocupado = false, frases = [];
-const cuenta = { consultas: 0, preavisos: 0, cancelados: 0, alarmas: 0, errores: 0, tokensEntrada: 0, tokensSalida: 0 };
+const li = (texto, props) => Object.assign(document.createElement('li'), { textContent: texto, ...props });
+let grabacion, consultas, audio, preaviso, evento, inicio, desde, ocupado = false;
+let frases = [], puntos = [], activo = 0, eventos = [];
+const cuenta = { consultas: 0, errores: 0, tokensEntrada: 0, tokensSalida: 0 };
 
 const texto = (filtro) => frases.filter(filtro).map((f) => f.texto).join('');
-const pintar = () => ($('contadores').textContent = Object.entries(cuenta).map(([k, v]) => `${k}: ${v}`).join(' · '));
+
+function pintar() {
+  $('puntos').replaceChildren(...puntos.map((p, i) => li(p, { className: i + 1 === activo ? 'activo' : '', onclick: () => activar(i + 1) })));
+  $('eventos').replaceChildren(...eventos.map((e) => li(`${e.hora} · ${e.tipo}${e.tema ? `: ${e.tema}` : ''}${e.resultado ? ` → ${e.resultado}` : ''}`)));
+  $('contadores').textContent = Object.entries(cuenta).map(([k, v]) => `${k}: ${v}`).join(' · ');
+}
+
+// Registro en pantalla de avisos y cambios de punto, para revisar después cuáles eran falsos. No se guarda.
+function registrar(tipo, tema = '', resultado = '') {
+  const e = { hora: new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }), tipo, tema, resultado };
+  eventos.push(e);
+  pintar();
+  return e;
+}
+
+// Cambiar de punto reinicia el minuto: lo hablado en el punto anterior no cuenta como desvío.
+function activar(n) {
+  activo = n;
+  desde = Date.now();
+  pintar();
+}
 
 $('empezar').onclick = () => {
+  puntos = $('orden').value.split('\n').map((l) => l.trim()).filter(Boolean);
+  if (!puntos.length) return ($('estado').textContent = 'Escribe el orden del día');
   audio = new AudioContext();
   navigator.wakeLock?.request('screen').catch(() => {});
   const cliente = new SonioxClient({ config: async () => (await fetch('/api/soniox-key', { method: 'POST' })).json() });
@@ -56,15 +90,17 @@ $('empezar').onclick = () => {
   });
   grabacion.on('state_change', ({ new_state }) => ($('estado').textContent = new_state));
   grabacion.on('error', (e) => ($('estado').textContent = `Error: ${e.message}`));
+  eventos = [];
+  activo = 0;
   inicio = desde = Date.now();
   consultas = setInterval(comprobar, CADA_MS);
-  $('empezar').hidden = true;
-  $('terminar').hidden = false;
+  for (const id of ['preparar', 'empezar']) $(id).hidden = true;
+  for (const id of ['noAviso', 'terminar']) $(id).hidden = false;
   $('resumen').textContent = '';
   pintar();
 };
 
-// Solo se consulta cuando hay un minuto completo de conversación desde el inicio o desde el último aviso.
+// Solo se consulta con un minuto completo desde el inicio, el último aviso o el último cambio de punto.
 async function comprobar() {
   const corte = Date.now() - VENTANA_MS;
   if (ocupado || preaviso || corte < desde) return;
@@ -72,11 +108,16 @@ async function comprobar() {
   if (!ultimo.trim()) return;
   ocupado = true;
   try {
-    const r = await (await fetch('/api/vueltas', { method: 'POST', body: JSON.stringify({ antes: texto((f) => f.t < corte), ultimo }) })).json();
+    const cuerpo = { orden: puntos, activo, antes: texto((f) => f.t < corte), ultimo };
+    const r = await (await fetch('/api/analizar', { method: 'POST', body: JSON.stringify(cuerpo) })).json();
     cuenta.consultas++;
     cuenta.tokensEntrada += r.uso.input_tokens;
     cuenta.tokensSalida += r.uso.output_tokens;
-    if (r.vueltas && grabacion) avisar(r.tema);
+    if (!grabacion || r.accion === 'nada') return;
+    if (r.accion === 'cambio de punto') {
+      activar(r.punto);
+      registrar(r.accion, r.tema, 'automático');
+    } else avisar(r.accion, r.tema, r.accion === 'otro punto' ? r.punto : 0);
   } catch {
     cuenta.errores++;
   } finally {
@@ -85,25 +126,34 @@ async function comprobar() {
   }
 }
 
-function avisar(tema) {
-  cuenta.preavisos++;
+function avisar(tipo, tema, punto) {
+  evento = registrar(tipo, tema, 'preaviso');
+  $('mensaje').textContent = {
+    'vueltas': `Estáis dando vueltas a ${tema || 'lo mismo'}`,
+    'otro punto': `Os habéis ido al punto ${punto} (${tema}) sin cerrar el punto ${activo}`,
+    'fuera del orden del día': `Os habéis salido del orden del día: ${tema || 'otro asunto'}`,
+  }[tipo];
+  $('irPunto').hidden = !punto;
+  $('irPunto').textContent = `Ir al punto ${punto}`;
+  $('irPunto').onclick = () => { cerrarAviso('ir al punto'); activar(punto); };
   let s = PREAVISO_S;
-  $('tema').textContent = tema || 'el mismo tema';
+  const tic = () => { $('segundos').textContent = s; if (s-- === 0) cerrarAviso('sonó'); };
   $('aviso').hidden = false;
-  const tic = () => { $('segundos').textContent = s; if (s-- === 0) cerrarAviso(true); };
   tic();
   preaviso = setInterval(tic, 1000);
 }
 
-function cerrarAviso(sonar) {
+function cerrarAviso(resultado) {
   clearInterval(preaviso);
   preaviso = null;
   $('aviso').hidden = true;
   desde = Date.now();
-  if (sonar) { cuenta.alarmas++; pitar(); } else cuenta.cancelados++;
+  evento.resultado = resultado;
+  if (resultado === 'sonó') pitar();
   pintar();
 }
-$('cancelar').onclick = () => cerrarAviso(false);
+$('cancelar').onclick = () => cerrarAviso('cancelado');
+$('noAviso').onclick = () => registrar('no ha avisado');
 
 function pitar() {
   document.body.classList.add('alarma');
@@ -118,19 +168,20 @@ function pitar() {
   }
 }
 
-// Al terminar se borra la transcripción: solo quedan los contadores en pantalla.
+// Al terminar se borra la transcripción; quedan en pantalla el registro de avisos y los contadores.
 $('terminar').onclick = async () => {
   clearInterval(consultas);
-  if (preaviso) { clearInterval(preaviso); preaviso = null; $('aviso').hidden = true; }
+  if (preaviso) cerrarAviso('reunión terminada');
   const g = grabacion;
   grabacion = null;
   await g.stop();
   frases = [];
-  $('texto').textContent = '';
-  $('estado').textContent = '';
+  puntos = [];
+  for (const id of ['texto', 'estado']) $(id).textContent = '';
   $('resumen').textContent = `Reunión terminada: ${((Date.now() - inicio) / 60000).toFixed(1)} min. Transcripción borrada.`;
-  $('terminar').hidden = true;
-  $('empezar').hidden = false;
+  for (const id of ['noAviso', 'terminar']) $(id).hidden = true;
+  for (const id of ['preparar', 'empezar']) $(id).hidden = false;
+  pintar();
 };
 </script>
 </body>

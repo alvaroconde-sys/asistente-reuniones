@@ -30,5 +30,23 @@ Formato: decisión · alternativas descartadas · motivo. Lo que decide el CPO v
   - Prueba de extremo a extremo con Playwright, simulando Soniox y Claude.
   - 20 casos escritos a mano (`casos.json`) para medir el detector real. Los casos codifican la definición de «vueltas»: los revisa el CPO.
 
-### Pendiente
-- Umbrales para dar la V1 por buena: aciertos mínimos y falsas alarmas máximas (CPO).
+## 2026-10-24
+
+### Producto (CPO)
+- **Aviso de cambio de tema.** Salta si durante **1 minuto** se habla de otro punto del orden del día o de algo que no está en él. Usa el mismo aviso que las vueltas: preaviso de 5 s y alarma.
+- **«Ir al punto X»** cuando el salto es a otro punto del orden del día: cambia el punto activo sin alarma.
+- **El punto activo lo deduce la IA.** Descartado: que lo marque el organizador.
+  - Regla de IT para que seguir la conversación no anule el aviso: la IA solo cambia de punto sin avisar si el punto activo quedó **cerrado** (se decidió, se acordó dejarlo para luego o alguien propuso pasar a otro). Si se salta sin cerrarlo, avisa.
+  - El organizador puede corregir el punto activo con un clic.
+  - Pendiente de validar con la medición.
+- **Botón «No ha avisado»** para contar lo que se escapa en reuniones reales.
+- **Umbrales para dar la V1 por buena:**
+  - En la prueba de casos: al menos 8 de cada 10 detectados en cada tipo de aviso, y como mucho 1 de cada 10 falsas alarmas.
+  - En reunión real: como mucho 1 alarma falsa que llegue a sonar por hora.
+
+### Técnicas
+- **Una sola consulta cada 30 s** devuelve punto, cerrado, vueltas y tema. Descartado: dos consultas separadas. Motivo: la mitad de llamadas. Si la medición muestra que una detección empeora la otra, se separan.
+- **La decisión de qué hacer (avisar, cambiar de punto o nada) vive en `detector.mjs`**, no en la página. Motivo: la página y la medición usan la misma lógica, sin duplicarla.
+- **Si la IA responde un punto que no existe, no se hace nada.** Descartado: avisar. Motivo: ante la duda, no molestar.
+- **Registro de avisos en pantalla** (hora, tipo, tema y resultado). Sirve para revisar qué avisos eran falsos. No se guarda: desaparece al cerrar la pestaña. La transcripción se sigue borrando al terminar.
+- **35 casos de prueba sobre 7 órdenes del día inventados:** 10 de vueltas, 5 de otro punto, 5 fuera del orden del día, 5 cambios legítimos y 10 sin aviso. Los 20 casos anteriores se mantienen, con orden del día y punto activo añadidos.

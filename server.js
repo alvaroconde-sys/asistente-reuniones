@@ -2,7 +2,7 @@
 // No guarda ni registra el contenido de las reuniones.
 import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';
-import { detectarVueltas } from './detector.mjs';
+import { analizar } from './detector.mjs';
 
 const { SONIOX_API_KEY, ANTHROPIC_API_KEY, SONIOX_REGION = '', PORT = 3000 } = process.env;
 if (!SONIOX_API_KEY || !ANTHROPIC_API_KEY) throw new Error('Faltan SONIOX_API_KEY o ANTHROPIC_API_KEY en .env');
@@ -26,10 +26,7 @@ const rutas = {
     return json({ api_key, region: SONIOX_REGION || undefined });
   },
 
-  'POST /api/vueltas': async (req) => {
-    const { antes, ultimo } = JSON.parse(await leer(req));
-    return json(await detectarVueltas(antes, ultimo));
-  },
+  'POST /api/analizar': async (req) => json(await analizar(JSON.parse(await leer(req)))),
 };
 
 createServer(async (req, res) => {
