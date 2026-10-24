@@ -59,3 +59,14 @@ Formato: decisión · alternativas descartadas · motivo. Lo que decide el CPO v
   - Salida estructurada con esquema JSON (`output_config.format`), que la API garantiza y que admite Haiku 5.5.
   - Una respuesta cortada, rechazada o que no es JSON se cuenta como error, no como «nada».
 - **El razonamiento se decide midiendo.** `npm run eval` compara 4 configuraciones y la página usa `POR_DEFECTO` (de momento, Haiku pensando poco) hasta tener datos. Criterio: la más barata y rápida que cumpla los umbrales.
+
+### Segunda medición (24-oct, 12:16; 35 casos)
+- **Haiku, en sus 3 configuraciones:** vueltas 10/10, sin aviso 10/10, cambio de punto 5/5, fuera 5/5, **otro punto 3/5**, falsas alarmas 0/15, 0 errores.
+  - Fallan distintos casos según la configuración: d01, d02, d03 y d05.
+  - Pensar no mejora el acierto. Sin pensar es la más barata: 1462 tokens de salida, frente a 1712 pensando poco y 4999 pensando normal.
+- **Sonnet sin pensar:** todo correcto. Tarda 2,4 s de media por consulta, frente a 1,5–1,8 s de Haiku.
+- **Coste de la medición completa:** unos 0,11 $. Sale de los tokens medidos por los precios de Anthropic: Haiku 0,10 $ / 0,50 $ y Sonnet 2 $ / 10 $ por millón de tokens de entrada / salida. Por consulta, Sonnet cuesta unas 20 veces lo que Haiku.
+- **Patrón del fallo:** el salto de tema se lee como si alguien hubiera propuesto pasar a otro punto, y lo toma por cierre del punto activo. Es un error silencioso: cambia de punto sin avisar.
+- **Cambio:** la definición de «cerrado» exige un cierre expreso. Empezar a hablar de otro asunto, aunque enlace con lo anterior, no cierra el punto. Se redacta sin copiar las frases de los casos, para no inflar la medición.
+- **Más casos:** 5 nuevos de otro punto y 5 de cambio legítimo, con otras frases, para tener 10 por tipo y vigilar que la regla más estricta no convierta cambios legítimos en avisos falsos. Total: 45.
+- **Riesgo abierto:** en los casos, «lo anterior» es corto. En una reunión real crece con cada minuto, y con él el coste de cada consulta. Se mide en la primera reunión real (la página muestra los tokens). Si hace falta, se aplica caché de prompt.

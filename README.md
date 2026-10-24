@@ -26,11 +26,11 @@ No hace falta `npm install` para usarlo: la página carga el SDK de Soniox desde
 
 ## Medir el detector
 
-`npm run eval` pasa por el detector real los 35 casos de `casos.json`:
+`npm run eval` pasa por el detector real los 45 casos de `casos.json`:
 - 10 de vueltas;
-- 5 de salto a otro punto;
+- 10 de salto a otro punto;
 - 5 de asuntos fuera del orden del día;
-- 5 de cambios de punto legítimos;
+- 10 de cambios de punto legítimos;
 - 10 en los que no debe pasar nada.
 
 Lo hace en las 4 configuraciones de `detector.mjs` (Haiku sin pensar, Haiku pensando poco, Haiku pensando normal y Sonnet sin pensar). De cada una muestra:
