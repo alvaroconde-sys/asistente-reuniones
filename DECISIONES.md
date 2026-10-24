@@ -103,3 +103,19 @@ Formato: decisión · alternativas descartadas · motivo. Lo que decide el CPO v
 - **Coste:** hasta 360 consultas por hora. Al coste por consulta de la prueba, ~1,1 $/h; con consulta cada 15 s serían ~0,76 $/h. Pendiente de medir en una reunión real.
 - **Validez de los casos con ventana de 30 s:** el último tramo de los casos tiene 38–66 palabras (mediana 53). A 120–150 palabras/min de habla normal (Loperete 1984, citado en *Estudios de Fonética Experimental*, UB) son ~15–33 s. Es decir, los casos ya eran tramos de unos 30 s o menos.
 - **Nueva medición con «último tramo»** (CPO, 24-oct, 13:00; Sonnet sin pensar): 45/45 aciertos, 0/20 falsas alarmas y 0 errores. Respuesta media en 2,0 s, así que el peor caso queda en ~47 s. Tokens: 52149 de entrada y 1660 de salida, unos 0,12 $.
+
+### Segunda prueba en solitario (24-oct, 13:04–13:06; 2,5 min)
+- **Dato** (CPO): 4 eventos.
+  - Cambio de punto automático.
+  - Fuera del orden del día: sonó.
+  - Otro punto: «Ir al punto».
+  - Vueltas: sonó.
+  
+  Todos son los que el CPO provocó. Las alarmas sonaron unos 30 s después de provocar el problema, según el CPO; el cálculo del peor caso daba ~47 s. 6 consultas: 7225 tokens de entrada y 213 de salida, ~0,017 $ (~0,0028 $ por consulta).
+- **Lectura** (hipótesis): avisa antes del peor caso porque basta con que la mayor parte de los últimos 30 s trate del problema.
+- **Coste por hora:** con 6 consultas por minuto y el coste por consulta de esta prueba, ~1 $/h si no hay avisos; cada aviso pausa las consultas 30 s. Crece con la duración de cada punto: falta medirlo en una reunión larga.
+- **Pendiente para cerrar la V1:**
+  - 60 min seguidos sin cortes de transcripción.
+  - Coste real por hora.
+  - Falsas alarmas que suenan por hora en una reunión real (umbral: ≤1).
+  - Lo que se escapa («No ha avisado»).
