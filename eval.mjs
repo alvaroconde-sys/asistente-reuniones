@@ -5,7 +5,8 @@ import { analizar, CONFIGS } from './detector.mjs';
 const ALERTAS = ['vueltas', 'otro punto', 'fuera del orden del día'];
 const sinAlerta = datos.casos.filter((c) => !ALERTAS.includes(c.accion)).length;
 
-for (const config of Object.keys(CONFIGS)) {
+// Sin argumento mide todas; `npm run eval -- "sonnet sin pensar"` mide solo una.
+for (const config of process.argv[2] ? [process.argv[2]] : Object.keys(CONFIGS)) {
   console.log(`\n== ${config}`);
   const tipos = {};
   let falsas = 0, errores = 0, primerError = '', entrada = 0, salida = 0, ms = 0;

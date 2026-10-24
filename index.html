@@ -43,13 +43,13 @@
 <script type="module">
 import { SonioxClient } from 'https://cdn.jsdelivr.net/npm/@soniox/client@2.4.0/dist/index.mjs';
 
-const VENTANA_MS = 60_000; // 1 minuto de vueltas o fuera del punto antes de avisar (DECISIONES.md)
-const CADA_MS = 30_000;    // cada cuánto se consulta al detector
+const VENTANA_MS = 30_000; // 30 s de vueltas o fuera del punto antes de avisar (DECISIONES.md)
+const CADA_MS = 10_000;    // cada cuánto se consulta al detector
 const PREAVISO_S = 5;      // segundos que tiene el organizador para cancelar
 
 const $ = (id) => document.getElementById(id);
 const li = (texto, props) => Object.assign(document.createElement('li'), { textContent: texto, ...props });
-let grabacion, consultas, audio, preaviso, evento, inicio, desde, ocupado = false;
+let grabacion, consultas, audio, preaviso, evento, inicio, desde, inicioPunto, ocupado = false;
 let frases = [], puntos = [], activo = 0, eventos = [];
 const cuenta = { consultas: 0, errores: 0, tokensEntrada: 0, tokensSalida: 0 };
 
@@ -69,15 +69,16 @@ function registrar(tipo, tema = '', resultado = '') {
   return e;
 }
 
-// Cambiar de punto reinicia el minuto: lo hablado en el punto anterior no cuenta como desvío.
-function activar(n) {
+// Lo hablado antes del punto activo no se manda al detector: las vueltas se miden dentro del punto.
+// El punto empieza al inicio de la ventana en la que se detectó el cambio, para no perder sus primeras frases.
+function activar(n, comienzo = Date.now() - VENTANA_MS) {
   activo = n;
-  desde = Date.now();
+  inicioPunto = comienzo;
   pintar();
 }
 
 $('empezar').onclick = () => {
-  puntos = $('orden').value.split('\n').map((l) => l.trim()).filter(Boolean);
+  puntos = $('orden').value.split('\n').map((l) => l.replace(/^\s*(?:[-*•]|\d+[.)])?\s*/, '').trim()).filter(Boolean);
   if (!puntos.length) return ($('estado').textContent = 'Escribe el orden del día');
   audio = new AudioContext();
   navigator.wakeLock?.request('screen').catch(() => {});
@@ -92,7 +93,7 @@ $('empezar').onclick = () => {
   grabacion.on('error', (e) => ($('estado').textContent = `Error: ${e.message}`));
   eventos = [];
   activo = 0;
-  inicio = desde = Date.now();
+  inicio = desde = inicioPunto = Date.now();
   consultas = setInterval(comprobar, CADA_MS);
   for (const id of ['preparar', 'empezar']) $(id).hidden = true;
   for (const id of ['noAviso', 'terminar']) $(id).hidden = false;
@@ -100,7 +101,7 @@ $('empezar').onclick = () => {
   pintar();
 };
 
-// Solo se consulta con un minuto completo desde el inicio, el último aviso o el último cambio de punto.
+// Solo se consulta con una ventana completa desde el inicio o desde el último aviso.
 async function comprobar() {
   const corte = Date.now() - VENTANA_MS;
   if (ocupado || preaviso || corte < desde) return;
@@ -108,14 +109,14 @@ async function comprobar() {
   if (!ultimo.trim()) return;
   ocupado = true;
   try {
-    const cuerpo = { orden: puntos, activo, antes: texto((f) => f.t < corte), ultimo };
+    const cuerpo = { orden: puntos, activo, antes: texto((f) => f.t >= inicioPunto && f.t < corte), ultimo };
     const r = await (await fetch('/api/analizar', { method: 'POST', body: JSON.stringify(cuerpo) })).json();
     cuenta.consultas++;
     cuenta.tokensEntrada += r.uso.input_tokens;
     cuenta.tokensSalida += r.uso.output_tokens;
     if (!grabacion || r.accion === 'nada') return;
     if (r.accion === 'cambio de punto') {
-      activar(r.punto);
+      activar(r.punto, corte);
       registrar(r.accion, r.tema, 'automático');
     } else avisar(r.accion, r.tema, r.accion === 'otro punto' ? r.punto : 0);
   } catch {

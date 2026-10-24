@@ -87,3 +87,18 @@ Formato: decisión · alternativas descartadas · motivo. Lo que decide el CPO v
 - **Coste por consulta** (tokens medidos × precios de Anthropic): Haiku normal ~0,00016 $; Sonnet ~0,0027 $. Esta medición costó ~0,14 $.
 - **Modelo para la prueba real: Sonnet sin pensar** (CPO). Descartado: Haiku pensando normal. Motivo: es la única configuración sin fallos. En el piloto el coste absoluto es pequeño, y así un fallo en la reunión real se podrá atribuir a la idea y no al modelo. Haiku queda como vía para abaratar cuando la idea esté validada.
 - **Riesgo abierto:** en los casos, «lo anterior» es corto. En una reunión real crece con cada minuto, y con él el coste de cada consulta. Se mide en la primera reunión real (la página muestra los tokens). Si hace falta, se aplica caché de prompt.
+
+### Prueba en solitario y tiempos (24-oct, 12:47)
+- **Dato** (prueba del CPO, 2,7 min): 2 consultas, 2753 tokens de entrada y 79 de salida. Registro: cambio de punto automático a las 12:45 y alarma por asunto fuera del orden del día a las 12:46. Coste: ~0,0063 $, unos 0,0031 $ por consulta (precios de Sonnet).
+- **Problema** (CPO): tarda demasiado en avisar. Pide reducir los tiempos al menos a la mitad.
+- **Causa:** se sumaban la ventana de 60 s, la consulta cada 30 s, el preaviso de 5 s y el reinicio de la ventana tras cada cambio de punto automático. Peor caso desde que empieza el problema hasta la alarma: 60 + 30 + ~2,5 (respuesta de Sonnet en la medición) + 5 = ~97,5 s. Tras un cambio automático, hasta 60 s más; es lo que pasó en la prueba.
+- **Cambios:**
+  - **Ventana de 30 s** (CPO, «reducir a la mitad»): «dar vueltas» o «salirse del punto» durante 30 s.
+  - **Consulta cada 10 s.** Descartado: cada 15 s, unos 5 s más lento de media.
+  - **Sin espera tras un cambio de punto.** Solo se espera una ventana tras un aviso, para no repetir la alarma por lo mismo.
+  - Peor caso nuevo: 30 + 10 + ~2,5 + 5 = **~47,5 s**.
+  - **Al detector solo llega lo hablado en el punto activo.** El punto empieza al inicio de la ventana en la que se detectó. Las vueltas se miden dentro del punto, y el coste por consulta deja de crecer con toda la reunión: crece con la duración del punto.
+  - El texto para el modelo dice «último tramo» en lugar de «último minuto». Se vuelve a medir con `npm run eval -- "sonnet sin pensar"`.
+  - Del orden del día se quitan los guiones y la numeración que escriba el usuario.
+- **Coste:** hasta 360 consultas por hora. Al coste por consulta de la prueba, ~1,1 $/h; con consulta cada 15 s serían ~0,76 $/h. Pendiente de medir en una reunión real.
+- **Validez de los casos con ventana de 30 s:** el último tramo de los casos tiene 38–66 palabras (mediana 53). A 120–150 palabras/min de habla normal (Loperete 1984, citado en *Estudios de Fonética Experimental*, UB) son ~15–33 s. Es decir, los casos ya eran tramos de unos 30 s o menos.

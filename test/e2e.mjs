@@ -38,51 +38,58 @@ const visible = (id) => pagina.locator(`#${id}`).isVisible();
 const activo = () => pagina.textContent('#puntos li.activo');
 const eventos = async () => (await pagina.locator('#eventos li').allTextContents()).map((e) => e.replace(/^\S+ · /, ''));
 
-// Habla y avanza el reloj de 30 en 30 s hasta que la página consulta al detector, que contesta `respuesta`.
+// Habla y avanza el reloj de 10 en 10 s hasta que la página consulta al detector, que contesta `respuesta`.
+// Devuelve cuántos saltos de 10 s hicieron falta.
 async function consultar(respuesta) {
   respuestas.push(respuesta);
   const n = peticionesClaude.length;
-  for (let i = 0; i < 8 && peticionesClaude.length === n; i++) {
-    decir(`Seguimos hablando (${i}). `);
-    await pagina.clock.runFor(30_000);
-    await pagina.waitForTimeout(500);
+  let saltos = 0;
+  while (peticionesClaude.length === n && saltos < 12) {
+    decir(`Seguimos hablando (${saltos}). `);
+    await pagina.clock.runFor(10_000);
+    await pagina.waitForTimeout(300);
+    saltos++;
   }
   assert.equal(peticionesClaude.length, n + 1, 'debería consultar al detector');
+  return saltos;
 }
 
 await pagina.clock.install();
 await pagina.goto('http://127.0.0.1:3999');
 
-// 1. Sin orden del día no empieza; las líneas vacías no cuentan como punto.
+// 1. Sin orden del día no empieza; las líneas vacías no cuentan y se quitan guiones y numeración.
 await pagina.click('#empezar');
 assert.equal(await pagina.textContent('#estado'), 'Escribe el orden del día');
-await pagina.fill('#orden', 'Presupuesto\nCalendario\n\nResponsables');
+await pagina.fill('#orden', '- Presupuesto\n2. Calendario\n\n* Responsables');
 await pagina.click('#empezar');
 for (let i = 0; !configSoniox && i < 50; i++) await pagina.waitForTimeout(100);
 assert.equal(configSoniox?.model, 'stt-rt-v5');
 assert.deepEqual(configSoniox.language_hints, ['es']);
 assert.deepEqual(await pagina.locator('#puntos li').allTextContents(), ['Presupuesto', 'Calendario', 'Responsables']);
 
-// 2. Antes de un minuto no se consulta.
+// 2. Antes de una ventana completa (30 s) no se consulta.
 decir('Buenos días, empezamos. ');
-await pagina.clock.runFor(31_000);
-await pagina.waitForTimeout(500);
-assert.equal(peticionesClaude.length, 0, 'no debe consultar antes de un minuto');
+await pagina.clock.runFor(21_000);
+await pagina.waitForTimeout(300);
+assert.equal(peticionesClaude.length, 0, 'no debe consultar antes de 30 s');
 
 // 3. Primer punto detectado: se activa solo, sin aviso.
 await consultar({ punto: 1, cerrado: false, vueltas: false, tema: '' });
 assert.equal(await activo(), 'Presupuesto');
 assert.equal(await visible('aviso'), false);
 
-// 4. Vueltas: preaviso sin «Ir al punto»; cancelar evita la alarma.
-await consultar({ punto: 1, cerrado: false, vueltas: true, tema: 'el reparto' });
+// 4. Tras un cambio automático no hay espera: se consulta en el siguiente salto de 10 s.
+// Vueltas: preaviso sin «Ir al punto»; cancelar evita la alarma.
+assert.equal(await consultar({ punto: 1, cerrado: false, vueltas: true, tema: 'el reparto' }), 1);
+assert.match(peticionesClaude.at(-1).messages[0].content, /ANTERIOR:\nBuenos días/, 'lo anterior del mismo punto sí se manda');
 assert.equal(await pagina.textContent('#mensaje'), 'Estáis dando vueltas a el reparto');
 assert.equal(await visible('irPunto'), false);
 await pagina.click('#cancelar');
 assert.equal(await visible('aviso'), false);
 
-// 5. Salto a otro punto sin cerrar: «Ir al punto 2» lo activa sin alarma.
-await consultar({ punto: 2, cerrado: false, vueltas: false, tema: '' });
+// 5. Tras un aviso sí hay espera de al menos una ventana (3 o 4 saltos, según cuándo se cancele).
+// Salto a otro punto sin cerrar: «Ir al punto 2» lo activa sin alarma.
+assert.ok(await consultar({ punto: 2, cerrado: false, vueltas: false, tema: '' }) >= 3, 'tras un aviso debe esperar 30 s');
 assert.equal(await pagina.textContent('#mensaje'), 'Os habéis ido al punto 2 (Calendario) sin cerrar el punto 1');
 await pagina.click('#irPunto');
 assert.equal(await activo(), 'Calendario');
@@ -97,7 +104,7 @@ assert.match(await pagina.getAttribute('body', 'class'), /alarma/);
 // 7. Punto cerrado: cambio automático. Una respuesta inválida (punto inexistente) no hace nada.
 await consultar({ punto: 3, cerrado: true, vueltas: false, tema: '' });
 assert.equal(await activo(), 'Responsables');
-await consultar({ punto: 9 });
+assert.equal(await consultar({ punto: 9 }), 1);
 assert.equal(await visible('aviso'), false);
 assert.equal(await activo(), 'Responsables');
 
@@ -107,7 +114,8 @@ assert.equal(ultima.model, 'claude-sonnet-5-5');
 assert.equal(ultima.thinking.type, 'between_tools');
 assert.equal(ultima.output_config.effort, 'low');
 assert.equal(ultima.output_config.format.type, 'json_schema');
-assert.match(ultima.messages[0].content, /^ORDEN DEL DÍA:\n1\. Presupuesto\n2\. Calendario\n3\. Responsables\n\nPUNTO ACTIVO: 3\n\nANTERIOR:\nBuenos días[\s\S]*\n\nÚLTIMO MINUTO:\nSeguimos hablando/);
+assert.match(ultima.messages[0].content, /^ORDEN DEL DÍA:\n1\. Presupuesto\n2\. Calendario\n3\. Responsables\n\nPUNTO ACTIVO: 3\n\nANTERIOR:\n[\s\S]*\n\nÚLTIMO TRAMO:\nSeguimos hablando/);
+assert.doesNotMatch(ultima.messages[0].content, /Buenos días/, 'lo hablado en puntos anteriores no se manda');
 
 // 9. Corrección manual del punto activo y «No ha avisado».
 await pagina.click('#puntos li >> nth=0');

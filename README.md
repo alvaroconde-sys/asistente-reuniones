@@ -1,6 +1,6 @@
 # Asistente de reuniones
 
-Asistente para guiar reuniones presenciales. Fase actual: **V1, prueba de concepto del detector**. El organizador escribe el orden del día y la app escucha la reunión desde el portátil. La IA deduce de qué punto se está hablando y avisa si, durante un minuto:
+Asistente para guiar reuniones presenciales. Fase actual: **V1, prueba de concepto del detector**. El organizador escribe el orden del día y la app escucha la reunión desde el portátil. La IA deduce de qué punto se está hablando y avisa si, durante 30 segundos:
 - se dan vueltas: se repite lo ya dicho sin dato nuevo ni decisión;
 - se salta a otro punto sin cerrar el actual (ofrece «Ir al punto X»);
 - se habla de algo que no está en el orden del día.
@@ -40,7 +40,7 @@ Lo hace en las 4 configuraciones de `detector.mjs` (Haiku sin pensar, Haiku pens
 - los errores (respuestas cortadas o no válidas);
 - los tokens y el tiempo medio por consulta.
 
-Cada caso indica su orden del día (de los 7 inventados al principio del fichero), el punto activo, lo dicho antes, el último minuto y la acción esperada.
+Cada caso indica su orden del día (de los 7 inventados al principio del fichero), el punto activo, lo dicho antes, el último tramo y la acción esperada. Para medir una sola configuración: `npm run eval -- "sonnet sin pensar"`.
 
 ## Pruebas (desarrollo)
 
@@ -50,7 +50,7 @@ Cada caso indica su orden del día (de los 7 inventados al principio del fichero
 
 | Fichero | Qué hace |
 |---|---|
-| `index.html` | Página: orden del día, captura, consultas cada 30 s, avisos, alarma, registro y borrado al terminar |
+| `index.html` | Página: orden del día, captura, consultas cada 10 s, avisos, alarma, registro y borrado al terminar |
 | `server.js` | Servidor local (solo 127.0.0.1): claves temporales de Soniox y consultas al detector |
 | `detector.mjs` | Pregunta a Claude de qué punto se habla y si hay vueltas, y decide la acción |
 | `casos.json`, `eval.mjs` | Casos de prueba del detector y su medición |

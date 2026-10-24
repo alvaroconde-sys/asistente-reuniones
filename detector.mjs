@@ -1,4 +1,4 @@
-// Detector: pregunta a Claude de qué punto del orden del día se habla en el último minuto
+// Detector: pregunta a Claude de qué punto del orden del día se habla en el último tramo
 // y si se está dando vueltas, y decide qué tiene que hacer la página.
 
 // Configuraciones que compara `npm run eval`; la página usa POR_DEFECTO (DECISIONES.md).
@@ -11,10 +11,10 @@ export const CONFIGS = {
 export const POR_DEFECTO = 'sonnet sin pensar';
 
 const INSTRUCCIONES = `Eres el detector de una reunión presencial en español.
-Recibes el ORDEN DEL DÍA numerado, el PUNTO ACTIVO, la transcripción ANTERIOR y el ÚLTIMO MINUTO. Devuelve:
-- "punto": número del punto del orden del día del que trata la mayor parte del último minuto, o 0 si trata de un asunto que no está en el orden del día. Una mención breve o una frase suelta sobre otro asunto no cuenta.
+Recibes el ORDEN DEL DÍA numerado, el PUNTO ACTIVO, la transcripción ANTERIOR y el ÚLTIMO TRAMO. Devuelve:
+- "punto": número del punto del orden del día del que trata la mayor parte del último tramo, o 0 si trata de un asunto que no está en el orden del día. Una mención breve o una frase suelta sobre otro asunto no cuenta.
 - "cerrado": true solo si el punto activo terminó de forma expresa antes de pasar a otro: se tomó una decisión sobre él, se acordó dejarlo para más tarde, o alguien dijo que se daba por cerrado o que se pasaba al siguiente punto. Si simplemente se empieza a hablar de otro asunto, aunque se enlace con lo que se estaba diciendo, el punto activo no está cerrado: false.
-- "vueltas": true si en el último minuto se repiten argumentos, propuestas o preguntas que ya aparecen antes (o dentro del propio minuto) sin aportar ningún dato nuevo, sin avanzar hacia una decisión y sin tomarla. No son vueltas: la presentación inicial de un tema, un dato nuevo, una pregunta nueva, una opción nueva ni un resumen que acaba en una decisión o en un reparto de tareas. Ante la duda, false.
+- "vueltas": true si en el último tramo se repiten argumentos, propuestas o preguntas que ya aparecen antes (o dentro del propio tramo) sin aportar ningún dato nuevo, sin avanzar hacia una decisión y sin tomarla. No son vueltas: la presentación inicial de un tema, un dato nuevo, una pregunta nueva, una opción nueva ni un resumen que acaba en una decisión o en un reparto de tareas. Ante la duda, false.
 - "tema": si "punto" es 0, el asunto ajeno al orden del día; si hay vueltas, lo que se repite; 8 palabras como máximo, o vacío.
 Analiza solo el contenido; no juzgues a las personas ni sus emociones.`;
 
@@ -35,7 +35,7 @@ export async function analizar({ orden, activo, antes, ultimo }, config = POR_DE
     `ORDEN DEL DÍA:\n${orden.map((p, i) => `${i + 1}. ${p}`).join('\n')}`,
     `PUNTO ACTIVO: ${activo || 'ninguno todavía'}`,
     `ANTERIOR:\n${antes || '(nada)'}`,
-    `ÚLTIMO MINUTO:\n${ultimo}`,
+    `ÚLTIMO TRAMO:\n${ultimo}`,
   ].join('\n\n');
   const res = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
