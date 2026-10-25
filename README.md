@@ -1,11 +1,11 @@
 # Asistente de reuniones
 
-Asistente para guiar reuniones presenciales. Fase actual: **V1, prueba de concepto del detector**. El organizador escribe el orden del día y la app escucha la reunión desde el portátil. La IA deduce de qué punto se está hablando y avisa si, durante 30 segundos:
+Asistente para guiar reuniones presenciales. Fase actual: **V1, prueba de concepto del detector**. El organizador configura la reunión: escribe los puntos del orden del día y asigna a cada uno un tipo, que fija su tiempo (Small decisions, 15 min; Big decisions, 30 min; Save the world, 60 min). La app escucha la reunión desde el portátil y avisa por voz cuando quedan 5 minutos de un punto y cuando se acaba su tiempo. Al cerrar un punto, el tiempo que le sobra (o el que se pasó) se suma (o se resta) al siguiente. La IA deduce de qué punto se está hablando y avisa si, durante 30 segundos:
 - se dan vueltas: se repite lo ya dicho sin dato nuevo ni decisión;
 - se salta a otro punto sin cerrar el actual (ofrece «Ir al punto X»);
 - se habla de algo que no está en el orden del día.
 
-Si el organizador no cancela el aviso en 5 s, suena una alarma. Al terminar, la transcripción se borra; en pantalla queda el registro de avisos para revisar cuáles eran falsos.
+Los avisos de la IA tienen un preaviso de 5 s en pantalla para cancelarlos; si nadie cancela, habla la voz. Mientras habla, la app deja de escuchar. Al terminar, la transcripción se borra; en pantalla queda el registro de avisos para revisar cuáles eran falsos.
 
 Decisiones y motivos: [DECISIONES.md](DECISIONES.md).
 
@@ -50,7 +50,7 @@ Cada caso indica su orden del día (de los 7 inventados al principio del fichero
 
 | Fichero | Qué hace |
 |---|---|
-| `index.html` | Página: orden del día, captura, consultas cada 10 s, avisos, alarma, registro y borrado al terminar |
+| `index.html` | Página: configuración, captura, tiempos por punto, consultas cada 10 s, avisos con voz, registro y borrado al terminar |
 | `server.js` | Servidor local (solo 127.0.0.1): claves temporales de Soniox y consultas al detector |
 | `detector.mjs` | Pregunta a Claude de qué punto se habla y si hay vueltas, y decide la acción |
 | `casos.json`, `eval.mjs` | Casos de prueba del detector y su medición |

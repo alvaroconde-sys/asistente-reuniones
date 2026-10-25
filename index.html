@@ -7,8 +7,12 @@
 <style>
   body { font: 18px/1.5 system-ui, sans-serif; max-width: 760px; margin: 2rem auto; padding: 0 16px; color: #1a1a1a; background: #fff; }
   body.alarma { background: #c62828; }
-  button { font: inherit; padding: .6rem 1.4rem; border-radius: 8px; border: 1px solid #888; cursor: pointer; }
-  textarea { font: inherit; width: 100%; box-sizing: border-box; }
+  button, input, select { font: inherit; }
+  button { padding: .6rem 1.4rem; border-radius: 8px; border: 1px solid #888; cursor: pointer; }
+  fieldset { border: 1px solid #ccc; border-radius: 8px; }
+  .fila { display: flex; flex-wrap: wrap; gap: .5rem; margin-bottom: .5rem; }
+  .fila input { flex: 1 1 12rem; min-width: 0; }
+  .fila button { padding: 0 .8rem; }
   #empezar { background: #1b5e20; color: #fff; border: 0; }
   #puntos li { cursor: pointer; }
   #puntos li.activo { font-weight: bold; color: #1b5e20; }
@@ -20,9 +24,11 @@
 </head>
 <body>
 <h1>Prueba del detector</h1>
-<label id="preparar">Orden del día, un punto por línea
-  <textarea id="orden" rows="5"></textarea>
-</label>
+<fieldset id="preparar">
+  <legend>Orden del día</legend>
+  <div id="filas"></div>
+  <button id="anadir">Añadir punto</button>
+</fieldset>
 <p>
   <button id="empezar">Empezar reunión</button>
   <button id="noAviso" hidden>No ha avisado</button>
@@ -31,7 +37,7 @@
 </p>
 <ol id="puntos" title="Pulsa un punto para corregir el punto activo"></ol>
 <div id="aviso" hidden>
-  <span id="mensaje"></span>. Alarma en <strong id="segundos"></strong> s<br>
+  <span id="mensaje"></span>. Aviso en <strong id="segundos"></strong> s<br>
   <button id="cancelar">Cancelar</button>
   <button id="irPunto"></button>
 </div>
@@ -45,18 +51,35 @@ import { SonioxClient } from 'https://cdn.jsdelivr.net/npm/@soniox/client@2.4.0/
 
 const VENTANA_MS = 30_000; // 30 s de vueltas o fuera del punto antes de avisar (DECISIONES.md)
 const CADA_MS = 10_000;    // cada cuánto se consulta al detector
-const PREAVISO_S = 5;      // segundos que tiene el organizador para cancelar
+const PREAVISO_S = 5;      // segundos que tiene el organizador para cancelar un aviso de la IA
+const CINCO_MIN = 5 * 60_000;
+const TIPOS = { 'Small decisions': 15, 'Big decisions': 30, 'Save the world': 60 }; // minutos por punto
+const FRASES = {
+  'cinco minutos': 'Quedan 5 minutos para finalizar el tiempo de este punto del orden del día, por favor, vayan sacando conclusiones para cerrarlo',
+  'fin de tiempo': 'Se ha acabado el tiempo para este punto, por favor, pasen al siguiente',
+  'vueltas': 'Están dando vueltas, por favor, cambien el enfoque para poder seguir avanzando',
+  'fuera del orden del día': 'Se está divagando, por favor, céntrense en el punto del orden del día',
+  'otro punto': 'Han cambiado de punto sin cerrar el actual, por favor, ciérrenlo antes de seguir',
+};
 
 const $ = (id) => document.getElementById(id);
 const li = (texto, props) => Object.assign(document.createElement('li'), { textContent: texto, ...props });
-let grabacion, consultas, audio, preaviso, evento, inicio, desde, inicioPunto, ocupado = false;
-let frases = [], puntos = [], activo = 0, eventos = [];
+let grabacion, consultas, reloj, preaviso, evento, inicio, desde, inicioPunto, ocupado = false, callado = false;
+let frases = [], puntos = [], activo = 0, eventos = [], previsto = 0;
 const cuenta = { consultas: 0, errores: 0, tokensEntrada: 0, tokensSalida: 0 };
 
 const texto = (filtro) => frases.filter(filtro).map((f) => f.texto).join('');
+const actual = () => puntos[activo - 1];
+// Tiempo que le queda a un punto; negativo si se ha pasado.
+const restante = (p) => p.presupuesto - p.usado - (p === actual() ? Date.now() - inicioPunto : 0);
+const mmss = (ms) => { const s = Math.floor(Math.abs(ms) / 1000); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; };
 
 function pintar() {
-  $('puntos').replaceChildren(...puntos.map((p, i) => li(p, { className: i + 1 === activo ? 'activo' : '', onclick: () => activar(i + 1) })));
+  $('puntos').replaceChildren(...puntos.map((p, i) => {
+    const r = restante(p);
+    const tiempo = r >= 0 ? `quedan ${mmss(r)}` : `${mmss(r)} de más`;
+    return li(`${p.nombre} · ${p.tipo} · ${tiempo}`, { className: i + 1 === activo ? 'activo' : '', onclick: () => activar(i + 1) });
+  }));
   $('eventos').replaceChildren(...eventos.map((e) => li(`${e.hora} · ${e.tipo}${e.tema ? `: ${e.tema}` : ''}${e.resultado ? ` → ${e.resultado}` : ''}`)));
   $('contadores').textContent = Object.entries(cuenta).map(([k, v]) => `${k}: ${v}`).join(' · ');
 }
@@ -69,18 +92,42 @@ function registrar(tipo, tema = '', resultado = '') {
   return e;
 }
 
-// Lo hablado antes del punto activo no se manda al detector: las vueltas se miden dentro del punto.
 // El punto empieza al inicio de la ventana en la que se detectó el cambio, para no perder sus primeras frases.
-function activar(n, comienzo = Date.now() - VENTANA_MS) {
+// Al cerrar un punto, lo que le sobra (o lo que se ha pasado, en negativo) pasa al punto siguiente.
+// Lo hablado antes del punto activo no se manda al detector: las vueltas se miden dentro del punto.
+function activar(n, comienzo = Date.now() - VENTANA_MS, cerrado = false) {
+  const anterior = actual();
+  comienzo = Math.max(comienzo, inicioPunto);
+  if (anterior) anterior.usado += comienzo - inicioPunto;
   activo = n;
   inicioPunto = comienzo;
+  const nuevo = actual();
+  if (anterior && cerrado) {
+    const r = restante(anterior);
+    anterior.presupuesto -= r;
+    nuevo.presupuesto += r;
+  }
+  if (restante(nuevo) <= CINCO_MIN) nuevo.aviso5 = true; // si ya quedan menos de 5 minutos, ese aviso no se da
   pintar();
 }
 
+function anadirFila() {
+  const fila = Object.assign(document.createElement('div'), { className: 'fila' });
+  fila.innerHTML = `<input placeholder="Punto del orden del día"><select>${Object.entries(TIPOS).map(([t, m]) => `<option value="${t}">${t} · ${m} min</option>`).join('')}</select><button title="Quitar punto">✕</button>`;
+  fila.querySelector('button').onclick = () => fila.remove();
+  $('filas').append(fila);
+}
+$('anadir').onclick = anadirFila;
+for (let i = 0; i < 3; i++) anadirFila();
+
 $('empezar').onclick = () => {
-  puntos = $('orden').value.split('\n').map((l) => l.replace(/^\s*(?:[-*•]|\d+[.)])?\s*/, '').trim()).filter(Boolean);
+  puntos = [...document.querySelectorAll('.fila')]
+    .map((f) => ({ nombre: f.querySelector('input').value.trim(), tipo: f.querySelector('select').value }))
+    .filter((p) => p.nombre)
+    .map((p) => ({ ...p, presupuesto: TIPOS[p.tipo] * 60_000, usado: 0, aviso5: false, finDicho: 0 }));
   if (!puntos.length) return ($('estado').textContent = 'Escribe el orden del día');
-  audio = new AudioContext();
+  previsto = puntos.reduce((s, p) => s + TIPOS[p.tipo], 0);
+  speechSynthesis.getVoices(); // las voces cargan en segundo plano: así están listas para el primer aviso
   navigator.wakeLock?.request('screen').catch(() => {});
   const cliente = new SonioxClient({ config: async () => (await fetch('/api/soniox-key', { method: 'POST' })).json() });
   grabacion = cliente.realtime.record({ model: 'stt-rt-v5', language_hints: ['es'], auto_reconnect: true });
@@ -95,28 +142,29 @@ $('empezar').onclick = () => {
   activo = 0;
   inicio = desde = inicioPunto = Date.now();
   consultas = setInterval(comprobar, CADA_MS);
+  reloj = setInterval(cadaSegundo, 1000);
   for (const id of ['preparar', 'empezar']) $(id).hidden = true;
   for (const id of ['noAviso', 'terminar']) $(id).hidden = false;
   $('resumen').textContent = '';
   pintar();
 };
 
-// Solo se consulta con una ventana completa desde el inicio o desde el último aviso.
+// Solo se consulta con una ventana completa desde el inicio o desde el último aviso de la IA.
 async function comprobar() {
   const corte = Date.now() - VENTANA_MS;
-  if (ocupado || preaviso || corte < desde) return;
+  if (ocupado || preaviso || callado || corte < desde) return;
   const ultimo = texto((f) => f.t >= corte);
   if (!ultimo.trim()) return;
   ocupado = true;
   try {
-    const cuerpo = { orden: puntos, activo, antes: texto((f) => f.t >= inicioPunto && f.t < corte), ultimo };
+    const cuerpo = { orden: puntos.map((p) => p.nombre), activo, antes: texto((f) => f.t >= inicioPunto && f.t < corte), ultimo };
     const r = await (await fetch('/api/analizar', { method: 'POST', body: JSON.stringify(cuerpo) })).json();
     cuenta.consultas++;
     cuenta.tokensEntrada += r.uso.input_tokens;
     cuenta.tokensSalida += r.uso.output_tokens;
     if (!grabacion || r.accion === 'nada') return;
     if (r.accion === 'cambio de punto') {
-      activar(r.punto, corte);
+      activar(r.punto, corte, true);
       registrar(r.accion, r.tema, 'automático');
     } else avisar(r.accion, r.tema, r.accion === 'otro punto' ? r.punto : 0);
   } catch {
@@ -127,6 +175,30 @@ async function comprobar() {
   }
 }
 
+// Avisos por tiempo: exactos, sin preaviso. «Fin de tiempo» se repite cada 5 minutos mientras sigan en el punto.
+function cadaSegundo() {
+  if (callado && !speechSynthesis.speaking) {
+    callado = false;
+    grabacion?.resume();
+  }
+  const p = actual();
+  if (p) {
+    const r = restante(p);
+    if (!p.aviso5 && r > 0 && r <= CINCO_MIN) {
+      p.aviso5 = true;
+      registrar('cinco minutos', p.nombre, 'sonó');
+      decir('cinco minutos');
+    }
+    if (r <= 0 && Date.now() - p.finDicho >= CINCO_MIN) {
+      p.finDicho = Date.now();
+      registrar('fin de tiempo', p.nombre, 'sonó');
+      decir('fin de tiempo');
+    }
+  }
+  pintar();
+}
+
+// Avisos de la IA: preaviso cancelable de 5 s y, si nadie cancela, voz.
 function avisar(tipo, tema, punto) {
   evento = registrar(tipo, tema, 'preaviso');
   $('mensaje').textContent = {
@@ -150,36 +222,37 @@ function cerrarAviso(resultado) {
   $('aviso').hidden = true;
   desde = Date.now();
   evento.resultado = resultado;
-  if (resultado === 'sonó') pitar();
+  if (resultado === 'sonó') decir(evento.tipo);
   pintar();
 }
 $('cancelar').onclick = () => cerrarAviso('cancelado');
 $('noAviso').onclick = () => registrar('no ha avisado');
 
-function pitar() {
+// Aviso a la sala: pantalla roja y voz. Mientras habla, la app deja de escuchar para no transcribirse
+// a sí misma («pasen al siguiente» cerraría el punto). Vuelve a escuchar cuando termina (cadaSegundo).
+function decir(tipo) {
   document.body.classList.add('alarma');
   setTimeout(() => document.body.classList.remove('alarma'), 3000);
-  for (let i = 0; i < 3; i++) {
-    const tono = audio.createOscillator();
-    tono.type = 'square';
-    tono.frequency.value = 880;
-    tono.connect(audio.destination);
-    tono.start(audio.currentTime + i * 0.4);
-    tono.stop(audio.currentTime + i * 0.4 + 0.25);
-  }
+  const voz = Object.assign(new SpeechSynthesisUtterance(FRASES[tipo]), { lang: 'es-ES' });
+  voz.voice = speechSynthesis.getVoices().find((v) => v.lang === 'es-ES') ?? null;
+  callado = true;
+  grabacion?.pause();
+  speechSynthesis.speak(voz);
 }
 
 // Al terminar se borra la transcripción; quedan en pantalla el registro de avisos y los contadores.
 $('terminar').onclick = async () => {
   clearInterval(consultas);
+  clearInterval(reloj);
   if (preaviso) cerrarAviso('reunión terminada');
+  speechSynthesis.cancel();
   const g = grabacion;
   grabacion = null;
   await g.stop();
   frases = [];
   puntos = [];
   for (const id of ['texto', 'estado']) $(id).textContent = '';
-  $('resumen').textContent = `Reunión terminada: ${((Date.now() - inicio) / 60000).toFixed(1)} min. Transcripción borrada.`;
+  $('resumen').textContent = `Reunión terminada. Previsto: ${previsto} min · Real: ${((Date.now() - inicio) / 60000).toFixed(1)} min. Transcripción borrada.`;
   for (const id of ['noAviso', 'terminar']) $(id).hidden = true;
   for (const id of ['preparar', 'empezar']) $(id).hidden = false;
   pintar();

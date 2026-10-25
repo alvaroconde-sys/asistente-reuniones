@@ -119,3 +119,36 @@ Formato: decisión · alternativas descartadas · motivo. Lo que decide el CPO v
   - Coste real por hora.
   - Falsas alarmas que suenan por hora en una reunión real (umbral: ≤1).
   - Lo que se escapa («No ha avisado»).
+
+## 2026-10-25
+
+### Producto (CPO)
+- **Configuración de la reunión:** cada punto del orden del día tiene un tipo que fija su tiempo: *Small decisions* 15 min, *Big decisions* 30 min y *Save the world* 60 min.
+- **Avisos por tiempo, con voz:**
+  - A falta de 5 min: «Quedan 5 minutos para finalizar el tiempo de este punto del orden del día, por favor, vayan sacando conclusiones para cerrarlo».
+  - Al acabar: «Se ha acabado el tiempo para este punto, por favor, pasen al siguiente». **Se repite cada 5 min** mientras sigan en el punto.
+  - **Sin preaviso**, porque son exactos.
+- **Avisos de la IA, con voz tras el preaviso de 5 s:**
+  - Divagar: «Se está divagando, por favor, céntrense en el punto del orden del día».
+  - Vueltas: «Están dando vueltas, por favor, cambien el enfoque para poder seguir avanzando».
+  - Salto a otro punto sin cerrar (propuesta de IT aceptada): «Han cambiado de punto sin cerrar el actual, por favor, ciérrenlo antes de seguir».
+  - Se corrige «centrensen» por «céntrense», que es la forma correcta.
+- **Traspaso de tiempo:** al cerrar un punto, lo que le sobra pasa al siguiente **y lo que se ha pasado se le resta** (CPO). Motivo: la reunión dura lo previsto, que es la métrica de éxito.
+
+### Técnicas
+- **Voz del navegador (`speechSynthesis`, es-ES).** Descartado: un servicio de voz. Motivo: es gratis, no añade dependencias y las frases son fijas. Si la voz de macOS suena mal, se graban las frases una vez. Chrome exige que la página haya recibido un clic antes de hablar (Chrome 71); lo da «Empezar reunión».
+- **Mientras habla, la app deja de escuchar** (`pause()`/`resume()` del SDK de Soniox) y no consulta al detector. Motivo: si no, se transcribiría a sí misma, y «pasen al siguiente» cerraría el punto. Se reanuda cuando `speechSynthesis.speaking` pasa a falso, comprobado cada segundo, en lugar de con `onend`, que no siempre se dispara.
+- **El traspaso solo ocurre cuando el punto se cierra** (cambio automático con cierre). Con «Ir al punto» o con un clic de corrección, el punto conserva su tiempo por si se vuelve a él.
+- **El tiempo de un punto empieza al inicio de la ventana en la que se detectó**, igual que lo que se manda al detector.
+- **Si un punto empieza con 5 min o menos,** no se dice «quedan 5 minutos». Si empieza con el tiempo agotado, se dice «se ha acabado el tiempo» al momento.
+- **Al terminar se muestra el tiempo previsto (suma de los tipos) frente al real.**
+- **Se quita el pitido** (`AudioContext`); la pantalla roja se mantiene.
+- **Verificación:** prueba de extremo a extremo con voz simulada y una segunda reunión con reloj simulado. Comprueba:
+  - el aviso de 5 min;
+  - el de fin de tiempo y su repetición;
+  - que se resta el exceso al cerrar;
+  - que no hay traspaso con «Ir al punto»;
+  - la pausa de la escucha mientras habla;
+  - el tiempo previsto frente al real.
+  
+  Ha pasado 3 de 3 veces. No comprobado: la voz real en macOS.
