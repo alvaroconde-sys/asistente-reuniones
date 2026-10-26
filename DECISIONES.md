@@ -152,3 +152,11 @@ Formato: decisión · alternativas descartadas · motivo. Lo que decide el CPO v
   - el tiempo previsto frente al real.
   
   Ha pasado 3 de 3 veces. No comprobado: la voz real en macOS.
+
+## 2026-10-26
+
+### Prueba en solitario con voz (CPO, 10:57; 2,0 min)
+- **Dato:** la voz «ha ido perfectamente» (CPO). Eventos: cambio de punto automático y «fuera del orden del día» (charla informal) con voz. 7 consultas: 7525 tokens de entrada y 227 de salida, ~0,017 $ (~0,0025 $ por consulta). Previsto 15 min, real 2,0 min.
+- **Pendiente para cerrar la V1:**
+  - Reunión real de ~60 min: estabilidad, coste por hora, falsas alarmas que suenan por hora y lo que se escapa.
+  - Ver en vivo los avisos de tiempo (5 minutos y fin).
