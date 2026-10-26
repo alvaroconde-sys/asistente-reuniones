@@ -196,3 +196,30 @@ Formato: decisión · alternativas descartadas · motivo. Lo que decide el CPO v
   - Se cuenta desde la mitad de la primera ventana en la que se detecta y se reinicia en cuanto vuelven al orden del día.
   - Avisa más o menos entre 65 y 85 s después de empezar a divagar, contando la detección, la consulta cada 10 s y el preaviso de 5 s. Es una estimación sobre los parámetros, no medida.
   - Vueltas sigue con su confirmación a los 30 s. El salto a otro punto avisa sin margen.
+
+### Revisión de código externa (otro agente, 26-oct, sobre 58ab6ec)
+14 hallazgos. IT los ha comprobado uno a uno en el código antes de decidir. Las líneas que el informe cita en `eval.mjs` y `detector.mjs` no corresponden con los ficheros (eval.mjs tiene 36 líneas y cita la 140), pero el código al que se refiere existe.
+
+**Aceptados y arreglados.** Cada uno tiene una prueba en `test/e2e.mjs`. Las de 1, 2, 3, 4 y 7 se han visto fallar con el código anterior.
+1. **Respuesta caducada tras un clic de corrección:** avisaba de «punto 2 sin cerrar el punto 2». Si el punto activo cambió mientras se esperaba la respuesta, ahora se descarta.
+2. **Respuesta en vuelo al pulsar «Terminar»:** se aplicaba a la reunión siguiente. Ahora se descarta si la grabación ya no es la misma.
+3. **Los contadores no se reiniciaban entre reuniones.** Ahora empiezan de cero en cada una. Efecto acotado en la reunión del 26-oct: la única prueba previa de ese día fue la de las 10:57, con 7 consultas y 7.525 tokens (~2 % de los 381.769). Si fue en la misma pestaña, las cifras de la reunión los incluyen.
+4. **Un clic en el punto ya activo recortaba «lo anterior» a 30 s.** Ahora no hace nada.
+6. **El SDK se rendía tras 3 reintentos, unos 7 s** (comprobado en su código: líneas 2102 y 2413-2431). Ahora hace 6 reintentos (63 s) y, si se rinde, se ve en grande «Se ha perdido la transcripción: pulsa Terminar». «Terminar» completa el borrado aunque `stop()` falle. Sin prueba de reconexión.
+7. **El blob del modo prueba se quedaba en memoria.** Se libera 1 s después de iniciar la descarga.
+8. **Otra web abierta en el navegador podía hacer POST al servidor local.** Ahora se rechaza todo POST que no lleve `Sec-Fetch-Site: same-origin`, con un 403.
+9. **Un error de JavaScript en la página no hacía fallar `npm test`.** Ahora sí.
+10. **La medición no comprobaba a qué punto se cambiaba.** Los 20 casos de cambio y salto llevan ahora el punto esperado, y se compara. Pendiente de medir con el detector real.
+13. **Mantenimiento:** una configuración desconocida en `eval` dice cuáles existen. Se quita una envoltura sobrante en `e2e`.
+
+**No aceptados o aplazados:**
+- **5. Si la voz habla mientras el SDK reconecta, la pausa no actúa.** Leído en el SDK, no reproducido. El arreglo propuesto, descartar el texto mientras habla la voz, también borraría las últimas palabras antes de cada aviso, porque `pause()` pide al servidor cerrar lo pendiente y esas palabras llegan con la voz ya hablando. Queda como riesgo conocido, poco probable.
+- **11. Consultas con el mismo texto que la anterior.** Sin medir con qué frecuencia pasan, y la regla es optimizar solo donde se mida un problema. Aplazado.
+- **12. Caché de prompt.** Sigue aplazada (CPO). El revisor estima un ahorro del 75-80 %, sin medir; los campos de caché de `usage` habría que sumarlos al panel cuando se active.
+- **14. JSON mal formado en el registro del servidor.** La página nunca lo envía. Sin cambio.
+
+**Riesgos de producto que señala el revisor** (decide el CPO):
+- Un «cerrado» mal detectado regala el sobrante al siguiente punto y no se puede deshacer.
+- Restar el exceso puede hacer que un punto empiece agotado y suene «fin de tiempo» nada más entrar.
+- Las vueltas se miden contra todo el punto: cuanto más largo el punto, más coste.
+- Al volver a un punto, el detector no recuerda lo que se dijo antes en él.

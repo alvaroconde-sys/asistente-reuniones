@@ -20,6 +20,7 @@
   #aviso { margin: 1rem 0; padding: 1.5rem; border-radius: 12px; background: #fff3cd; border: 3px solid #e65100; font-size: 1.4rem; }
   #aviso button { background: #e65100; color: #fff; border: 0; margin: .5rem .5rem 0 0; }
   #eventos, #contadores, #resumen { color: #555; font-size: .9rem; }
+  #estado.grave { color: #c62828; font-weight: bold; font-size: 1.3rem; }
 </style>
 </head>
 <body>
@@ -81,7 +82,7 @@ function pintar() {
   $('puntos').replaceChildren(...puntos.map((p, i) => {
     const r = restante(p);
     const tiempo = r >= 0 ? `quedan ${mmss(r)}` : `${mmss(r)} de más`;
-    return li(`${p.nombre} · ${p.tipo} · ${tiempo}`, { className: i + 1 === activo ? 'activo' : '', onclick: () => activar(i + 1) });
+    return li(`${p.nombre} · ${p.tipo} · ${tiempo}`, { className: i + 1 === activo ? 'activo' : '', onclick: () => i + 1 !== activo && activar(i + 1) });
   }));
   $('eventos').replaceChildren(...eventos.map((e) => li(`${e.hora} · ${e.tipo}${e.tema ? `: ${e.tema}` : ''}${e.resultado ? ` → ${e.resultado}` : ''}${e.erroneo ? ' · erróneo' : ''}`)));
   $('contadores').textContent = Object.entries(cuenta).map(([k, v]) => `${k}: ${v}`).join(' · ');
@@ -134,16 +135,22 @@ $('empezar').onclick = () => {
   speechSynthesis.getVoices(); // las voces cargan en segundo plano: así están listas para el primer aviso
   navigator.wakeLock?.request('screen').catch(() => {});
   const cliente = new SonioxClient({ config: async () => (await fetch('/api/soniox-key', { method: 'POST' })).json() });
-  grabacion = cliente.realtime.record({ model: 'stt-rt-v5', language_hints: ['es'], auto_reconnect: true });
+  // 6 reintentos: 1+2+4+8+16+32 = 63 s de margen ante un corte de red (el SDK trae 3, ~7 s).
+  grabacion = cliente.realtime.record({ model: 'stt-rt-v5', language_hints: ['es'], auto_reconnect: true, max_reconnect_attempts: 6 });
   grabacion.on('result', ({ tokens }) => {
     const final = tokens.filter((t) => t.is_final).map((t) => t.text).join('');
     if (final) frases.push({ t: Date.now(), texto: final });
     $('texto').textContent = (texto(() => true) + tokens.filter((t) => !t.is_final).map((t) => t.text).join('')).slice(-400);
   });
-  grabacion.on('state_change', ({ new_state }) => ($('estado').textContent = new_state));
+  // «error» solo llega cuando el SDK se rinde: sin transcripción no hay avisos de la IA, y tiene que verse.
+  grabacion.on('state_change', ({ new_state }) => {
+    $('estado').textContent = new_state === 'error' ? 'Se ha perdido la transcripción: pulsa «Terminar» y vuelve a empezar' : new_state;
+    $('estado').className = new_state === 'error' ? 'grave' : '';
+  });
   grabacion.on('error', (e) => ($('estado').textContent = `Error: ${e.message}`));
   eventos = [];
   activo = 0;
+  for (const k in cuenta) cuenta[k] = 0;
   inicio = desde = inicioPunto = Date.now();
   vueltaPendiente = divagarDesde = null;
   consultas = setInterval(comprobar, CADA_MS);
@@ -183,14 +190,17 @@ async function comprobar() {
   if (ocupado || preaviso || callado || corte < desde) return;
   const cuerpo = ventana(corte);
   if (!cuerpo.ultimo.trim()) return;
+  const g = grabacion;
   ocupado = true;
   try {
     const r = await (await fetch('/api/analizar', { method: 'POST', body: JSON.stringify(cuerpo) })).json();
+    if (grabacion !== g) return; // la reunión terminó mientras se esperaba la respuesta
     cuenta.consultas++;
     cuenta.tokensEntrada += r.uso.input_tokens;
     cuenta.tokensSalida += r.uso.output_tokens;
+    if (activo !== cuerpo.activo) return; // el organizador cambió de punto mientras se esperaba: respuesta caducada
     const divagarToca = seguirDivagando(r.accion, corte);
-    if (!grabacion || r.accion === 'nada') return;
+    if (r.accion === 'nada') return;
     if (r.accion === 'cambio de punto') {
       activar(r.punto, corte, true);
       registrar(r.accion, r.tema, 'automático');
@@ -290,7 +300,7 @@ $('terminar').onclick = async () => {
   speechSynthesis.cancel();
   const g = grabacion;
   grabacion = null;
-  await g.stop();
+  await g.stop().catch(() => {}); // pase lo que pase al parar, hay que borrar la transcripción
   frases = [];
   if ($('modoPrueba').checked) descargar({ fecha: new Date().toISOString(), orden: puntos.map(({ nombre, tipo }) => ({ nombre, tipo })), eventos });
   puntos = [];
@@ -307,6 +317,7 @@ function descargar(datos) {
   a.href = URL.createObjectURL(new Blob([JSON.stringify(datos, null, 2)], { type: 'application/json' }));
   a.download = `prueba-reunion-${datos.fecha.slice(0, 16).replace(':', '')}.json`;
   a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000); // libera la copia en memoria cuando la descarga ya ha empezado
   for (const e of eventos) { delete e.entrada; delete e.respuesta; }
 }
 </script>

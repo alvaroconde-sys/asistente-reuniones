@@ -44,7 +44,7 @@ Cada caso indica su orden del día (de los 7 inventados al principio del fichero
 
 ## Pruebas (desarrollo)
 
-`npm install && npm test`: prueba de extremo a extremo en Chromium con micrófono falso, con Soniox y Claude simulados. No usa claves ni consume saldo.
+`npm install && npm test`: prueba de extremo a extremo en Chromium con micrófono falso, con Soniox, Claude y la voz simulados. No usa claves ni consume saldo. Si falla porque no encuentra Chromium, ejecuta antes `npx playwright install chromium`.
 
 ## Ficheros
 

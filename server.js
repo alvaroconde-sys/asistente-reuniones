@@ -30,6 +30,8 @@ const rutas = {
 };
 
 createServer(async (req, res) => {
+  // Solo la propia página puede pedir claves o consultas: otra web abierta en el navegador no puede gastar saldo.
+  if (req.method === 'POST' && req.headers['sec-fetch-site'] !== 'same-origin') return res.writeHead(403).end();
   const ruta = rutas[`${req.method} ${req.url}`];
   try {
     const [estado, tipo, cuerpo] = ruta ? await ruta(req) : [404, 'text/plain', 'No encontrado'];

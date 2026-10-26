@@ -4,6 +4,7 @@ import { analizar, CONFIGS } from './detector.mjs';
 
 const ALERTAS = ['vueltas', 'otro punto', 'fuera del orden del día'];
 const sinAlerta = datos.casos.filter((c) => !ALERTAS.includes(c.accion)).length;
+if (process.argv[2] && !CONFIGS[process.argv[2]]) throw new Error(`Configuraciones: ${Object.keys(CONFIGS).join(', ')}`);
 
 // Sin argumento mide todas; `npm run eval -- "sonnet sin pensar"` mide solo una.
 for (const config of process.argv[2] ? [process.argv[2]] : Object.keys(CONFIGS)) {
@@ -26,8 +27,9 @@ for (const config of process.argv[2] ? [process.argv[2]] : Object.keys(CONFIGS))
     }
     entrada += r.uso.input_tokens;
     salida += r.uso.output_tokens;
-    if (r.accion === c.accion) t.bien++;
-    else console.log(`MAL ${c.id} · esperado: ${c.accion} · detectado: ${r.accion}`);
+    // En cambios y saltos de punto también tiene que acertar a qué punto.
+    if (r.accion === c.accion && (c.punto === undefined || r.punto === c.punto)) t.bien++;
+    else console.log(`MAL ${c.id} · esperado: ${c.accion}${c.punto ? ` ${c.punto}` : ''} · detectado: ${r.accion} ${r.punto}`);
     if (ALERTAS.includes(r.accion) && !ALERTAS.includes(c.accion)) falsas++;
   }
   console.log(`Aciertos: ${Object.entries(tipos).map(([k, v]) => `${k} ${v.bien}/${v.total}`).join(' · ')}`);

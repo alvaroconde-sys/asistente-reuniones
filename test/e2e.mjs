@@ -15,21 +15,22 @@ globalThis.fetch = async (url, opciones) => {
     const cuerpo = JSON.parse(opciones.body);
     peticionesClaude.push(cuerpo);
     const activo = Number(cuerpo.messages[0].content.match(/PUNTO ACTIVO: (\d+)/)?.[1] ?? 0);
-    const r = respuestas.shift() ?? { punto: activo, cerrado: false, vueltas: false, tema: '' };
+    const { retraso = 0, ...r } = respuestas.shift() ?? { punto: activo, cerrado: false, vueltas: false, tema: '' };
+    if (retraso) await new Promise((listo) => setTimeout(listo, retraso)); // respuesta lenta, en tiempo real
     return Response.json({ stop_reason: 'end_turn', content: [{ type: 'text', text: JSON.stringify(r) }], usage: { input_tokens: 10, output_tokens: 5 } });
   }
   return fetchReal(url, opciones);
 };
 await import('../server.js');
-const { FRASES } = { FRASES: {
+const FRASES = {
   fuera: 'Se está divagando, por favor, céntrense en el punto del orden del día',
   cinco: 'Quedan 5 minutos para finalizar el tiempo de este punto del orden del día, por favor, vayan sacando conclusiones para cerrarlo',
   fin: 'Se ha acabado el tiempo para este punto, por favor, pasen al siguiente',
-} };
+};
 
 const navegador = await chromium.launch({ args: ['--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream'] });
 const pagina = await navegador.newPage();
-pagina.on('pageerror', (e) => console.error('Error en la página:', e.message));
+pagina.on('pageerror', (e) => { throw new Error(`Error en la página: ${e.message}`); }); // un error de JS hace fallar la prueba
 const sdk = await readFile(new URL('../node_modules/@soniox/client/dist/index.mjs', import.meta.url), 'utf8');
 await pagina.route('https://cdn.jsdelivr.net/**', (r) => r.fulfill({ contentType: 'text/javascript', body: sdk }));
 // Voz simulada: apunta lo que se dice y «habla» durante 2 s.
@@ -38,6 +39,8 @@ await pagina.addInitScript(() => {
   let hasta = 0;
   speechSynthesis.speak = (u) => { window.dicho.push(u.text); hasta = Date.now() + 2000; };
   Object.defineProperty(speechSynthesis, 'speaking', { get: () => Date.now() < hasta });
+  const crear = URL.createObjectURL;
+  URL.createObjectURL = (b) => (window.ultimoBlob = crear(b)); // para comprobar que se libera
 });
 
 let soniox, configSoniox;
@@ -211,6 +214,8 @@ assert.equal(porTipo('fuera del orden del día').erroneo, true);
 assert.equal(porTipo('fuera del orden del día').entrada.activo, 2);
 assert.ok(porTipo('no ha avisado').entrada.ultimo, 'también guarda la ventana de «No ha avisado»');
 assert.equal(porTipo('cambio de punto').entrada, undefined, 'los cambios de punto no guardan texto');
+await avanzar(2_000);
+assert.equal(await pagina.evaluate(() => fetch(window.ultimoBlob).then(() => 'en memoria', () => 'liberado')), 'liberado', 'la copia del fichero se libera');
 assert.equal(await pagina.textContent('#texto'), '');
 assert.match(await pagina.textContent('#resumen'), /^Reunión terminada\. Previsto: 105 min · Real: \d+\.\d min\. Transcripción borrada\.$/);
 const almacenado = await pagina.evaluate(async () => localStorage.length + sessionStorage.length + (await indexedDB.databases()).length);
@@ -276,6 +281,43 @@ await pagina.click('#terminar');
 await pagina.waitForSelector('#empezar:not([hidden])');
 assert.match(await pagina.textContent('#resumen'), /Previsto: 45 min/);
 
-console.log(`Prueba superada: ${peticionesClaude.length} consultas; configuración, confirmación de vueltas, aviso erróneo, modo prueba, voz con escucha en pausa, tiempos por punto, traspaso al cerrar y borrado comprobados.`);
+// ===== Reunión C: respuestas lentas y contadores =====
+await configurar([['Uno', 'Small decisions'], ['Dos', 'Small decisions'], ['Tres', 'Small decisions']]);
+await empezar();
+assert.match(await pagina.textContent('#contadores'), /^consultas: 0 · errores: 0 · tokensEntrada: 0/, 'los contadores empiezan de cero');
+decir('Texto inicial del punto uno. ');
+await consultar({ punto: 1, cerrado: false, vueltas: false, tema: '' });
+assert.equal(await activo(), 'Uno');
+
+// 17. Un clic en el punto que ya está activo no hace nada: no recorta lo anterior.
+await avanzar(40_000);
+await pagina.click('#puntos li >> nth=0');
+await consultar({ punto: 1, cerrado: false, vueltas: false, tema: '' });
+assert.match(peticionesClaude.at(-1).messages[0].content, /ANTERIOR:\nTexto inicial/);
+
+// 18. Una respuesta lenta que llega después de un clic a otro punto se descarta: ni aviso ni cambio fantasma.
+await consultar({ punto: 2, cerrado: false, vueltas: false, tema: '', retraso: 1500 });
+await pagina.click('#puntos li >> nth=1');
+await pagina.waitForTimeout(2000);
+assert.equal(await visible('aviso'), false, 'no avisa de un salto que ya se corrigió');
+assert.equal(await activo(), 'Dos');
+assert.ok(!(await eventos()).some((e) => e.startsWith('otro punto')));
+
+// 19. Una respuesta lenta que llega después de «Terminar» y de empezar otra reunión no se aplica a la nueva.
+await consultar({ punto: 3, cerrado: true, vueltas: false, tema: '', retraso: 3000 });
+await pagina.click('#terminar');
+await pagina.waitForSelector('#empezar:not([hidden])');
+await empezar();
+await pagina.waitForTimeout(3500);
+assert.equal(await pagina.locator('#puntos li.activo').count(), 0, 'la respuesta vieja no activa puntos');
+assert.deepEqual(await eventos(), []);
+assert.match(await pagina.textContent('#contadores'), /^consultas: 0 ·/);
+await pagina.click('#terminar');
+await pagina.waitForSelector('#empezar:not([hidden])');
+
+// 20. El servidor rechaza las peticiones POST que no vienen de la propia página.
+assert.equal((await fetchReal('http://127.0.0.1:3999/api/analizar', { method: 'POST', body: '{}' })).status, 403);
+
+console.log(`Prueba superada: ${peticionesClaude.length} consultas; configuración, confirmación de vueltas, aviso erróneo, modo prueba, voz con escucha en pausa, tiempos por punto, traspaso al cerrar, respuestas caducadas, contadores, servidor y borrado comprobados.`);
 await navegador.close();
 process.exit(0);
