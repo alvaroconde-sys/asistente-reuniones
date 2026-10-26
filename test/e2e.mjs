@@ -103,6 +103,7 @@ assert.equal(await pagina.locator('.fila').count(), 4);
 await pagina.locator('.fila').nth(3).locator('button').click();
 assert.equal(await pagina.locator('.fila').count(), 3);
 await configurar([['Presupuesto', 'Small decisions'], ['Calendario', 'Big decisions'], ['Responsables', 'Save the world']]);
+await pagina.check('#modoPrueba');
 await empezar();
 assert.deepEqual(await puntos(), [
   'Presupuesto · Small decisions · quedan 15:00',
@@ -121,10 +122,17 @@ assert.equal(await activo(), 'Presupuesto');
 assert.equal(await visible('aviso'), false);
 assert.match((await puntos())[0], /quedan 14:/);
 
-// 4. Tras un cambio automático se consulta en el siguiente salto. Vueltas: preaviso sin «Ir al punto»;
-// cancelar evita la voz.
-assert.equal(await consultar({ punto: 1, cerrado: false, vueltas: true, tema: 'el reparto' }), 1);
+// 4. Tras un cambio automático se consulta en el siguiente salto. Vueltas necesita confirmación: una sola
+// detección no avisa; otra 30 s después sí, aunque en medio haya consultas sin vueltas. Preaviso sin
+// «Ir al punto»; cancelar evita la voz.
+const vueltas = { punto: 1, cerrado: false, vueltas: true, tema: 'el reparto' };
+const nada = { punto: 1, cerrado: false, vueltas: false, tema: '' };
+assert.equal(await consultar(vueltas), 1);
 assert.match(peticionesClaude.at(-1).messages[0].content, /ANTERIOR:\nBuenos días/, 'lo anterior del mismo punto sí se manda');
+assert.equal(await visible('aviso'), false, 'una sola detección de vueltas no avisa');
+await consultar(nada);
+await consultar(nada);
+await consultar(vueltas);
 assert.equal(await pagina.textContent('#mensaje'), 'Estáis dando vueltas a el reparto');
 assert.equal(await visible('irPunto'), false);
 await pagina.click('#cancelar');
@@ -148,6 +156,7 @@ assert.deepEqual(await dicho(), [FRASES.fuera]);
 assert.equal(await pagina.textContent('#estado'), 'paused', 'mientras habla no escucha');
 await avanzar(3_000);
 assert.equal(await pagina.textContent('#estado'), 'recording', 'al terminar de hablar vuelve a escuchar');
+await pagina.click('#erroneo'); // el aviso ya habló: se marca como erróneo
 
 // 7. Punto cerrado: cambio automático. Una respuesta inválida (punto inexistente) no hace nada.
 await consultar({ punto: 3, cerrado: true, vueltas: false, tema: '' });
@@ -173,14 +182,25 @@ assert.deepEqual(await eventos(), [
   'cambio de punto: Presupuesto → automático',
   'vueltas: el reparto → cancelado',
   'otro punto: Calendario → ir al punto',
-  'fuera del orden del día: la cena de Navidad → sonó',
+  'fuera del orden del día: la cena de Navidad → sonó · erróneo',
   'cambio de punto: Responsables → automático',
   'no ha avisado',
 ]);
 
-// 10. Al terminar: previsto frente a real, transcripción borrada, nada guardado; el registro sigue en pantalla.
-await pagina.click('#terminar');
+// 10. Al terminar: modo prueba descarga el texto que vio la IA en cada aviso; previsto frente a real,
+// transcripción borrada, nada guardado en el navegador; el registro sigue en pantalla.
+const [descarga] = await Promise.all([pagina.waitForEvent('download'), pagina.click('#terminar')]);
 await pagina.waitForSelector('#empezar:not([hidden])');
+assert.match(descarga.suggestedFilename(), /^prueba-reunion-\d{4}-\d{2}-\d{2}T\d{4}\.json$/);
+const fichero = JSON.parse(await readFile(await descarga.path(), 'utf8'));
+assert.deepEqual(fichero.orden.map((p) => p.tipo), ['Small decisions', 'Big decisions', 'Save the world']);
+const porTipo = (t) => fichero.eventos.find((e) => e.tipo === t);
+assert.equal(porTipo('vueltas').respuesta.accion, 'vueltas');
+assert.match(porTipo('vueltas').entrada.ultimo, /Seguimos hablando/);
+assert.equal(porTipo('fuera del orden del día').erroneo, true);
+assert.equal(porTipo('fuera del orden del día').entrada.activo, 2);
+assert.ok(porTipo('no ha avisado').entrada.ultimo, 'también guarda la ventana de «No ha avisado»');
+assert.equal(porTipo('cambio de punto').entrada, undefined, 'los cambios de punto no guardan texto');
 assert.equal(await pagina.textContent('#texto'), '');
 assert.match(await pagina.textContent('#resumen'), /^Reunión terminada\. Previsto: 105 min · Real: \d+\.\d min\. Transcripción borrada\.$/);
 const almacenado = await pagina.evaluate(async () => localStorage.length + sessionStorage.length + (await indexedDB.databases()).length);
@@ -188,6 +208,7 @@ assert.equal(almacenado, 0);
 assert.equal((await eventos()).length, 6);
 
 // ===== Reunión B: tiempos =====
+await pagina.uncheck('#modoPrueba');
 await configurar([['Uno', 'Small decisions'], ['Dos', 'Small decisions'], ['Tres', 'Small decisions']]);
 await empezar();
 await pagina.evaluate(() => (window.dicho = []));
@@ -218,10 +239,26 @@ const [, dos2, tres] = await puntos();
 assert.match(dos2, /quedan 9:/);
 assert.match(tres, /quedan 14:/);
 
+// 14. La confirmación de vueltas caduca: una segunda detección a más de 50 s de la primera no avisa.
+const vueltas3 = { punto: 3, cerrado: false, vueltas: true, tema: 'lo mismo' };
+const nada3 = { punto: 3, cerrado: false, vueltas: false, tema: '' };
+await consultar(vueltas3);
+for (let i = 0; i < 5; i++) await consultar(nada3);
+await consultar(vueltas3);
+assert.equal(await visible('aviso'), false, 'una detección de hace más de 50 s no confirma');
+
+// 15. «Este aviso es erróneo» durante el preaviso: lo cancela, no habla y lo marca.
+const antes = (await dicho()).length;
+await consultar({ punto: 0, cerrado: false, vueltas: false, tema: 'el fútbol' });
+await pagina.click('#erroneo');
+assert.equal(await visible('aviso'), false);
+assert.equal((await dicho()).length, antes);
+assert.equal((await eventos()).at(-1), 'fuera del orden del día: el fútbol → cancelado · erróneo');
+
 await pagina.click('#terminar');
 await pagina.waitForSelector('#empezar:not([hidden])');
 assert.match(await pagina.textContent('#resumen'), /Previsto: 45 min/);
 
-console.log(`Prueba superada: ${peticionesClaude.length} consultas; configuración, avisos de la IA, voz con escucha en pausa, tiempos por punto, traspaso al cerrar y borrado comprobados.`);
+console.log(`Prueba superada: ${peticionesClaude.length} consultas; configuración, confirmación de vueltas, aviso erróneo, modo prueba, voz con escucha en pausa, tiempos por punto, traspaso al cerrar y borrado comprobados.`);
 await navegador.close();
 process.exit(0);

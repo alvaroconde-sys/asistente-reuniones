@@ -28,9 +28,11 @@
   <legend>Orden del día</legend>
   <div id="filas"></div>
   <button id="anadir">Añadir punto</button>
+  <p><label><input type="checkbox" id="modoPrueba"> Modo prueba: al terminar, descargar en este portátil el texto que vio la IA en cada aviso (solo con el consentimiento de los asistentes)</label></p>
 </fieldset>
 <p>
   <button id="empezar">Empezar reunión</button>
+  <button id="erroneo" hidden>Este aviso es erróneo</button>
   <button id="noAviso" hidden>No ha avisado</button>
   <button id="terminar" hidden>Terminar</button>
   <span id="estado"></span>
@@ -64,7 +66,7 @@ const FRASES = {
 
 const $ = (id) => document.getElementById(id);
 const li = (texto, props) => Object.assign(document.createElement('li'), { textContent: texto, ...props });
-let grabacion, consultas, reloj, preaviso, evento, inicio, desde, inicioPunto, ocupado = false, callado = false;
+let grabacion, consultas, reloj, preaviso, evento, inicio, desde, inicioPunto, vueltaPendiente = null, ocupado = false, callado = false;
 let frases = [], puntos = [], activo = 0, eventos = [], previsto = 0;
 const cuenta = { consultas: 0, errores: 0, tokensEntrada: 0, tokensSalida: 0 };
 
@@ -80,7 +82,7 @@ function pintar() {
     const tiempo = r >= 0 ? `quedan ${mmss(r)}` : `${mmss(r)} de más`;
     return li(`${p.nombre} · ${p.tipo} · ${tiempo}`, { className: i + 1 === activo ? 'activo' : '', onclick: () => activar(i + 1) });
   }));
-  $('eventos').replaceChildren(...eventos.map((e) => li(`${e.hora} · ${e.tipo}${e.tema ? `: ${e.tema}` : ''}${e.resultado ? ` → ${e.resultado}` : ''}`)));
+  $('eventos').replaceChildren(...eventos.map((e) => li(`${e.hora} · ${e.tipo}${e.tema ? `: ${e.tema}` : ''}${e.resultado ? ` → ${e.resultado}` : ''}${e.erroneo ? ' · erróneo' : ''}`)));
   $('contadores').textContent = Object.entries(cuenta).map(([k, v]) => `${k}: ${v}`).join(' · ');
 }
 
@@ -101,6 +103,7 @@ function activar(n, comienzo = Date.now() - VENTANA_MS, cerrado = false) {
   if (anterior) anterior.usado += comienzo - inicioPunto;
   activo = n;
   inicioPunto = comienzo;
+  vueltaPendiente = null;
   const nuevo = actual();
   if (anterior && cerrado) {
     const r = restante(anterior);
@@ -141,23 +144,35 @@ $('empezar').onclick = () => {
   eventos = [];
   activo = 0;
   inicio = desde = inicioPunto = Date.now();
+  vueltaPendiente = null;
   consultas = setInterval(comprobar, CADA_MS);
   reloj = setInterval(cadaSegundo, 1000);
   for (const id of ['preparar', 'empezar']) $(id).hidden = true;
-  for (const id of ['noAviso', 'terminar']) $(id).hidden = false;
+  for (const id of ['erroneo', 'noAviso', 'terminar']) $(id).hidden = false;
   $('resumen').textContent = '';
   pintar();
 };
+
+// Lo que se manda al detector: orden del día, punto activo, lo hablado antes en el punto y el último tramo.
+const ventana = (corte) => ({ orden: puntos.map((p) => p.nombre), activo, antes: texto((f) => f.t >= inicioPunto && f.t < corte), ultimo: texto((f) => f.t >= corte) });
+
+// Vueltas solo se avisa si la detectan dos consultas cuyas ventanas no se solapan: la segunda entre 30 y 50 s
+// después de la primera (DECISIONES.md, 26-oct). Así hacen falta ~60 s de vueltas.
+function vueltasConfirmadas(corte) {
+  const desdePrimera = corte - vueltaPendiente;
+  if (vueltaPendiente !== null && desdePrimera >= VENTANA_MS && desdePrimera <= VENTANA_MS + 2 * CADA_MS) return true;
+  if (vueltaPendiente === null || desdePrimera > VENTANA_MS + 2 * CADA_MS) vueltaPendiente = corte;
+  return false;
+}
 
 // Solo se consulta con una ventana completa desde el inicio o desde el último aviso de la IA.
 async function comprobar() {
   const corte = Date.now() - VENTANA_MS;
   if (ocupado || preaviso || callado || corte < desde) return;
-  const ultimo = texto((f) => f.t >= corte);
-  if (!ultimo.trim()) return;
+  const cuerpo = ventana(corte);
+  if (!cuerpo.ultimo.trim()) return;
   ocupado = true;
   try {
-    const cuerpo = { orden: puntos.map((p) => p.nombre), activo, antes: texto((f) => f.t >= inicioPunto && f.t < corte), ultimo };
     const r = await (await fetch('/api/analizar', { method: 'POST', body: JSON.stringify(cuerpo) })).json();
     cuenta.consultas++;
     cuenta.tokensEntrada += r.uso.input_tokens;
@@ -166,7 +181,10 @@ async function comprobar() {
     if (r.accion === 'cambio de punto') {
       activar(r.punto, corte, true);
       registrar(r.accion, r.tema, 'automático');
-    } else avisar(r.accion, r.tema, r.accion === 'otro punto' ? r.punto : 0);
+    } else if (r.accion !== 'vueltas' || vueltasConfirmadas(corte)) {
+      avisar(r.accion, r.tema, r.accion === 'otro punto' ? r.punto : 0);
+      if ($('modoPrueba').checked) Object.assign(evento, { entrada: cuerpo, respuesta: { accion: r.accion, punto: r.punto, tema: r.tema } });
+    }
   } catch {
     cuenta.errores++;
   } finally {
@@ -200,6 +218,7 @@ function cadaSegundo() {
 
 // Avisos de la IA: preaviso cancelable de 5 s y, si nadie cancela, voz.
 function avisar(tipo, tema, punto) {
+  vueltaPendiente = null;
   evento = registrar(tipo, tema, 'preaviso');
   $('mensaje').textContent = {
     'vueltas': `Estáis dando vueltas a ${tema || 'lo mismo'}`,
@@ -226,7 +245,17 @@ function cerrarAviso(resultado) {
   pintar();
 }
 $('cancelar').onclick = () => cerrarAviso('cancelado');
-$('noAviso').onclick = () => registrar('no ha avisado');
+$('noAviso').onclick = () => {
+  const e = registrar('no ha avisado');
+  if ($('modoPrueba').checked) e.entrada = ventana(Date.now() - VENTANA_MS);
+};
+// Marca como erróneo el último aviso de la IA; si aún está en preaviso, además lo cancela.
+$('erroneo').onclick = () => {
+  if (!evento || evento.erroneo) return;
+  evento.erroneo = true;
+  if (preaviso) cerrarAviso('cancelado');
+  else pintar();
+};
 
 // Aviso a la sala: pantalla roja y voz. Mientras habla, la app deja de escuchar para no transcribirse
 // a sí misma («pasen al siguiente» cerraría el punto). Vuelve a escuchar cuando termina (cadaSegundo).
@@ -250,13 +279,23 @@ $('terminar').onclick = async () => {
   grabacion = null;
   await g.stop();
   frases = [];
+  if ($('modoPrueba').checked) descargar({ fecha: new Date().toISOString(), orden: puntos.map(({ nombre, tipo }) => ({ nombre, tipo })), eventos });
   puntos = [];
   for (const id of ['texto', 'estado']) $(id).textContent = '';
   $('resumen').textContent = `Reunión terminada. Previsto: ${previsto} min · Real: ${((Date.now() - inicio) / 60000).toFixed(1)} min. Transcripción borrada.`;
-  for (const id of ['noAviso', 'terminar']) $(id).hidden = true;
+  for (const id of ['erroneo', 'noAviso', 'terminar']) $(id).hidden = true;
   for (const id of ['preparar', 'empezar']) $(id).hidden = false;
   pintar();
 };
+
+// Modo prueba: el fichero queda solo en el portátil; en la página se borran los textos tras descargarlo.
+function descargar(datos) {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([JSON.stringify(datos, null, 2)], { type: 'application/json' }));
+  a.download = `prueba-reunion-${datos.fecha.slice(0, 16).replace(':', '')}.json`;
+  a.click();
+  for (const e of eventos) { delete e.entrada; delete e.respuesta; }
+}
 </script>
 </body>
 </html>

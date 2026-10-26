@@ -5,7 +5,7 @@ Asistente para guiar reuniones presenciales. Fase actual: **V1, prueba de concep
 - se salta a otro punto sin cerrar el actual (ofrece «Ir al punto X»);
 - se habla de algo que no está en el orden del día.
 
-Los avisos de la IA tienen un preaviso de 5 s en pantalla para cancelarlos; si nadie cancela, habla la voz. Mientras habla, la app deja de escuchar. Al terminar, la transcripción se borra; en pantalla queda el registro de avisos para revisar cuáles eran falsos.
+Los avisos de la IA tienen un preaviso de 5 s en pantalla para cancelarlos; si nadie cancela, habla la voz. El de vueltas necesita confirmarse en dos consultas separadas 30 s. Mientras habla, la app deja de escuchar. Durante la reunión, «Este aviso es erróneo» marca el último aviso de la IA y «No ha avisado» apunta lo que se escapó. Con el **modo prueba** marcado (solo con el consentimiento de los asistentes), al terminar se descarga en el portátil un JSON con lo que vio la IA en cada aviso, para convertirlo en casos de prueba. Al terminar, la transcripción se borra; en pantalla queda el registro de avisos para revisar cuáles eran falsos.
 
 Decisiones y motivos: [DECISIONES.md](DECISIONES.md).
 

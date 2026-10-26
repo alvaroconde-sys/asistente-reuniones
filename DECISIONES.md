@@ -174,3 +174,18 @@ Formato: decisión · alternativas descartadas · motivo. Lo que decide el CPO v
   - Los casos de prueba (45/45) no representan una reunión real. Son textos limpios escritos por IT, ya señalado como riesgo el 24-oct. En una conversación real se vuelve sobre lo dicho para matizarlo, y eso se lee como vueltas.
   - La ventana de 30 s lo agrava: en 30 s de habla es normal repetir lo que se acaba de decir.
   - Divagar se juzga contra el texto literal del punto, y no contra el propósito de la reunión.
+- **Corrección** (CPO, 26-oct): las 3 pulsaciones de «No ha avisado» de las 13:04 eran para marcar como erróneo el aviso que acababa de saltar, no avisos que faltaron. El texto no dejó de aparecer en ningún momento: transcripción estable durante los 24,4 min.
+
+### Cambios tras la primera reunión real (26-oct)
+- **Botón «Este aviso es erróneo»** (CPO). Marca el último aviso de la IA; si sigue en preaviso, además lo cancela. En el registro sale «· erróneo».
+- **Vueltas con confirmación** (CPO, opción A). Solo se avisa si la detectan dos consultas cuyas ventanas no se solapan, con la segunda entre 30 y 50 s después de la primera. Hacen falta unos 60 s de vueltas, así que el aviso llega unos 30 s más tarde. Descartado: endurecer solo la definición. Se aplica solo a vueltas; si divagar sigue dando falsos, se le puede aplicar lo mismo.
+- **Modo prueba** (CPO, opción B):
+  - Es una casilla en la configuración, desmarcada por defecto, para usar solo con el consentimiento de los asistentes.
+  - Al terminar, descarga en el portátil un JSON con lo que vio la IA en cada aviso (orden del día, punto activo, lo anterior, último tramo y respuesta) y con la ventana de cada «No ha avisado».
+  - Tras descargarlo, esos textos se borran de la página.
+  - Excepción consciente a «no se conservan las conversaciones», para obtener casos de prueba reales.
+- **Definiciones del detector** (IT; hipótesis, se valida con el modo prueba):
+  - Divagar: 0 solo si el asunto es ajeno a la reunión (personal, de otro proyecto o sin relación con el orden del día). Una tangente relacionada con el punto activo o con el tema de la reunión cuenta como el punto activo.
+  - Vueltas: matizar, precisar, dar una cifra, un ejemplo, una condición, una objeción o una consecuencia es avanzar.
+- **Uso en reuniones de Laguinda:** jurídico lo ha autorizado (CPO, 26-oct).
+- **La caché de prompt se aplaza** hasta que la detección cumpla los umbrales. Motivo: no añadir complejidad para abaratar algo que aún no funciona. Coste actual: ~2 $/h.
