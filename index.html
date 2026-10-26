@@ -58,6 +58,7 @@ const CADA_MS = 10_000;    // cada cuánto se consulta al detector
 const PREAVISO_S = 5;      // segundos que tiene el organizador para cancelar un aviso de la IA
 const CINCO_MIN = 5 * 60_000;
 const MARGEN_DIVAGAR = 60_000; // se permite divagar 1 minuto seguido (DECISIONES.md, 26-oct)
+const CONFIRMAR_MS = 5_000; // «Deshacer» pide un segundo clic en este plazo
 const TIPOS = { 'Small decisions': 15, 'Big decisions': 30, 'Save the world': 60 }; // minutos por punto
 const FRASES = {
   'cinco minutos': 'Quedan 5 minutos para finalizar el tiempo de este punto del orden del día, por favor, vayan sacando conclusiones para cerrarlo',
@@ -77,6 +78,7 @@ const texto = (filtro) => frases.filter(filtro).map((f) => f.texto).join('');
 const actual = () => puntos[activo - 1];
 // Tiempo que le queda a un punto; negativo si se ha pasado.
 const restante = (p) => p.presupuesto - p.usado - (p === actual() ? Date.now() - inicioPunto : 0);
+const confirmando = () => Date.now() - (deshacer?.pedido ?? 0) < CONFIRMAR_MS;
 const mmss = (ms) => { const s = Math.floor(Math.abs(ms) / 1000); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; };
 
 function pintar() {
@@ -88,7 +90,7 @@ function pintar() {
   $('eventos').replaceChildren(...eventos.map((e) => li(`${e.hora} · ${e.tipo}${e.tema ? `: ${e.tema}` : ''}${e.resultado ? ` → ${e.resultado}` : ''}${e.erroneo ? ' · erróneo' : ''}`)));
   $('contadores').textContent = Object.entries(cuenta).map(([k, v]) => `${k}: ${v}`).join(' · ');
   $('deshacer').hidden = !deshacer;
-  if (deshacer) $('deshacer').textContent = `Deshacer el cambio a «${actual().nombre}»`;
+  if (deshacer) $('deshacer').textContent = confirmando() ? '¿Seguro? Pulsa otra vez para deshacer' : `Deshacer el cambio a «${actual().nombre}»`;
 }
 
 // Registro en pantalla de avisos y cambios de punto, para revisar después cuáles eran falsos. No se guarda.
@@ -268,7 +270,12 @@ function avisar(tipo, tema, punto) {
   }[tipo];
   $('irPunto').hidden = !punto;
   $('irPunto').textContent = `Ir al punto ${punto}`;
-  $('irPunto').onclick = () => { cerrarAviso('ir al punto'); activar(punto); };
+  // Volver al punto del que acaba de sacaros la IA es deshacer ese cambio: recupera tiempo y sobrante.
+  $('irPunto').onclick = () => {
+    if (deshacer?.activo === punto) return deshacerCambio('ir al punto');
+    cerrarAviso('ir al punto');
+    activar(punto);
+  };
   let s = PREAVISO_S;
   const tic = () => { $('segundos').textContent = s; if (s-- === 0) cerrarAviso('sonó'); };
   $('aviso').hidden = false;
@@ -291,9 +298,8 @@ $('noAviso').onclick = () => {
   if ($('modoPrueba').checked) e.entrada = ventana(Date.now() - VENTANA_MS);
 };
 // Deshace el último cambio de punto automático: todo vuelve a como estaba, como si no hubiera ocurrido.
-$('deshacer').onclick = () => {
-  if (!deshacer) return;
-  if (preaviso) cerrarAviso('cancelado'); // un preaviso abierto se refería al punto que se deshace
+function deshacerCambio(resultadoAviso = 'cancelado') {
+  if (preaviso) cerrarAviso(resultadoAviso); // un preaviso abierto se refería al punto que se deshace
   version++;
   puntos.forEach((p, i) => Object.assign(p, deshacer.puntos[i]));
   ({ activo, inicioPunto } = deshacer);
@@ -301,6 +307,12 @@ $('deshacer').onclick = () => {
   deshacer = vueltaPendiente = divagarDesde = null;
   desde = Date.now(); // una ventana de margen antes de volver a consultar
   pintar();
+}
+// Un clic suelto no deshace: pide un segundo clic en 5 s.
+$('deshacer').onclick = () => {
+  if (!deshacer) return;
+  if (!confirmando()) { deshacer.pedido = Date.now(); return pintar(); }
+  deshacerCambio();
 };
 // Marca como erróneo el último aviso de la IA; si aún está en preaviso, además lo cancela.
 $('erroneo').onclick = () => {

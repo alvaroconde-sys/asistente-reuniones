@@ -305,11 +305,20 @@ const minutos = (t) => Number(t.match(/quedan (\d+):/)[1]);
 await consultar({ punto: 2, cerrado: true, vueltas: false, tema: '' });
 assert.equal(await activo(), 'Dos');
 assert.ok(minutos((await puntos())[1]) >= 27, 'Dos = sus 15 min + lo que le sobraba a Uno');
+// Un clic suelto no deshace: pide confirmación, y esta caduca a los 5 s.
+assert.equal(await pagina.textContent('#deshacer'), 'Deshacer el cambio a «Dos»');
+for (let i = 0; i < 2; i++) {
+  await pagina.click('#deshacer');
+  assert.equal(await activo(), 'Dos', 'un clic suelto no deshace');
+  assert.equal(await pagina.textContent('#deshacer'), '¿Seguro? Pulsa otra vez para deshacer');
+  await avanzar(6_000);
+  assert.equal(await pagina.textContent('#deshacer'), 'Deshacer el cambio a «Dos»', 'la confirmación caduca');
+}
 // La IA ve que se sigue en «Uno» y abre un preaviso de salto: deshacer también lo cancela y la voz no habla.
 const vocesAntes = (await dicho()).length;
 await consultar({ punto: 1, cerrado: false, vueltas: false, tema: '' });
 assert.equal(await pagina.textContent('#mensaje'), 'Os habéis ido al punto 1 (Uno) sin cerrar el punto 2');
-assert.equal(await pagina.textContent('#deshacer'), 'Deshacer el cambio a «Dos»');
+await pagina.click('#deshacer');
 await pagina.click('#deshacer');
 assert.equal(await visible('aviso'), false);
 await avanzar(6_000);
@@ -320,6 +329,16 @@ assert.equal(dosDeshecho, 'Dos · Small decisions · quedan 15:00');
 assert.ok(minutos(unoDeshecho) >= 12, 'Uno recupera su tiempo');
 assert.equal(await visible('deshacer'), false);
 assert.deepEqual((await eventos()).slice(-2), ['cambio de punto: Dos → automático · deshecho', 'otro punto: Uno → cancelado']);
+
+// 18b. «Ir al punto» hacia el punto del que sacó la IA deshace el cambio: «Dos» devuelve el sobrante a «Uno».
+await consultar({ punto: 2, cerrado: true, vueltas: false, tema: '' });
+assert.ok(minutos((await puntos())[1]) >= 25);
+await consultar({ punto: 1, cerrado: false, vueltas: false, tema: '' });
+await pagina.click('#irPunto');
+assert.equal(await activo(), 'Uno');
+assert.equal((await puntos())[1], 'Dos · Small decisions · quedan 15:00');
+assert.equal(await visible('deshacer'), false);
+assert.deepEqual((await eventos()).slice(-2), ['cambio de punto: Dos → automático · deshecho', 'otro punto: Uno → ir al punto']);
 
 // 19. Una respuesta lenta que llega después de cambiar de punto se descarta, también si se vuelve al mismo punto
 // antes de que llegue: ni aviso ni cambio fantasma. Tras deshacer, «Uno» recupera lo dicho en él.

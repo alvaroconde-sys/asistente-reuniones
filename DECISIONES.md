@@ -261,3 +261,9 @@ Formato: decisión · alternativas descartadas · motivo. Lo que decide el CPO v
 - Deshacer no caduca: un cambio se puede deshacer 20 minutos después y reasigna ese tiempo y ese texto.
 - Deshacer está junto a otros botones y no pide confirmación.
 - Tras deshacer, el punto real puede oír «quedan 5 minutos» con menos de 5, o «fin de tiempo» al momento.
+
+### «Deshacer»: decisiones del CPO sobre los riesgos de la segunda revisión (26-oct)
+- **Confirmación** (opción C): «Deshacer» pide un segundo clic en 5 s; pasado ese plazo, vuelve a pedirlo. No se usa la ventana de confirmación del navegador (`confirm()`), porque deja la página parada mientras está abierta. Descartada la caducidad a los 2 minutos (era la recomendación de IT).
+- **«Ir al punto» deshace** el cambio automático cuando propone volver al punto que estaba activo antes de ese cambio: devuelve el tiempo y el sobrante. Riesgo que encontró IT leyendo el código: antes, ese botón movía de punto sin devolver el sobrante y hacía desaparecer «Deshacer». Basta un clic, porque el preaviso ya da el contexto.
+- **Avisos de tiempo tras deshacer:** se quedan como están. El punto recupera su estado de avisos, así que puede sonar «quedan 5 minutos» con menos de 5 o «fin de tiempo» al momento. Ese mensaje empuja a cerrar, que es la métrica.
+- Pruebas: las tres nuevas (clic suelto, caducidad de la confirmación, «Ir al punto») fallan si se quita su arreglo.
