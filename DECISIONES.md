@@ -189,3 +189,10 @@ Formato: decisión · alternativas descartadas · motivo. Lo que decide el CPO v
   - Vueltas: matizar, precisar, dar una cifra, un ejemplo, una condición, una objeción o una consecuencia es avanzar.
 - **Uso en reuniones de Laguinda:** jurídico lo ha autorizado (CPO, 26-oct).
 - **La caché de prompt se aplaza** hasta que la detección cumpla los umbrales. Motivo: no añadir complejidad para abaratar algo que aún no funciona. Coste actual: ~2 $/h.
+- **Medición tras los cambios** (CPO, 26-oct, 19:30; Sonnet sin pensar): 45/45 aciertos, 0/20 falsas alarmas y 0 errores. Tokens: 58.044 de entrada y 1.635 de salida (~0,13 $).
+- **Criterio de divagar** (CPO): los casos f02 (tarjeta regalo de la competencia) y f05 (factura mal hecha de la agencia) **son divagar**. Divagar se permite, pero con un límite de tiempo.
+- **Corrección:** se deshace la definición de divagar de esta tarde, la que hacía que las tangentes relacionadas contaran como parte del punto. Era una hipótesis de IT y el criterio del CPO la contradice. Vuelve la definición anterior: asunto que no está en el orden del día.
+- **Margen para divagar: 1 minuto seguido** (CPO). Descartados: 2 y 3 minutos.
+  - Se cuenta desde la mitad de la primera ventana en la que se detecta y se reinicia en cuanto vuelven al orden del día.
+  - Avisa más o menos entre 65 y 85 s después de empezar a divagar, contando la detección, la consulta cada 10 s y el preaviso de 5 s. Es una estimación sobre los parámetros, no medida.
+  - Vueltas sigue con su confirmación a los 30 s. El salto a otro punto avisa sin margen.

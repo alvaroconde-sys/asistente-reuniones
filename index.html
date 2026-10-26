@@ -55,6 +55,7 @@ const VENTANA_MS = 30_000; // 30 s de vueltas o fuera del punto antes de avisar 
 const CADA_MS = 10_000;    // cada cuánto se consulta al detector
 const PREAVISO_S = 5;      // segundos que tiene el organizador para cancelar un aviso de la IA
 const CINCO_MIN = 5 * 60_000;
+const MARGEN_DIVAGAR = 60_000; // se permite divagar 1 minuto seguido (DECISIONES.md, 26-oct)
 const TIPOS = { 'Small decisions': 15, 'Big decisions': 30, 'Save the world': 60 }; // minutos por punto
 const FRASES = {
   'cinco minutos': 'Quedan 5 minutos para finalizar el tiempo de este punto del orden del día, por favor, vayan sacando conclusiones para cerrarlo',
@@ -66,7 +67,7 @@ const FRASES = {
 
 const $ = (id) => document.getElementById(id);
 const li = (texto, props) => Object.assign(document.createElement('li'), { textContent: texto, ...props });
-let grabacion, consultas, reloj, preaviso, evento, inicio, desde, inicioPunto, vueltaPendiente = null, ocupado = false, callado = false;
+let grabacion, consultas, reloj, preaviso, evento, inicio, desde, inicioPunto, vueltaPendiente = null, divagarDesde = null, ocupado = false, callado = false;
 let frases = [], puntos = [], activo = 0, eventos = [], previsto = 0;
 const cuenta = { consultas: 0, errores: 0, tokensEntrada: 0, tokensSalida: 0 };
 
@@ -103,7 +104,7 @@ function activar(n, comienzo = Date.now() - VENTANA_MS, cerrado = false) {
   if (anterior) anterior.usado += comienzo - inicioPunto;
   activo = n;
   inicioPunto = comienzo;
-  vueltaPendiente = null;
+  vueltaPendiente = divagarDesde = null;
   const nuevo = actual();
   if (anterior && cerrado) {
     const r = restante(anterior);
@@ -144,7 +145,7 @@ $('empezar').onclick = () => {
   eventos = [];
   activo = 0;
   inicio = desde = inicioPunto = Date.now();
-  vueltaPendiente = null;
+  vueltaPendiente = divagarDesde = null;
   consultas = setInterval(comprobar, CADA_MS);
   reloj = setInterval(cadaSegundo, 1000);
   for (const id of ['preparar', 'empezar']) $(id).hidden = true;
@@ -165,6 +166,17 @@ function vueltasConfirmadas(corte) {
   return false;
 }
 
+// Divagar se permite hasta 1 minuto seguido. Se cuenta desde la mitad de la primera ventana en la que se detecta
+// (la divagación ya ocupa la mayor parte de esa ventana) y se reinicia en cuanto vuelven al orden del día.
+function seguirDivagando(accion, corte) {
+  if (accion !== 'fuera del orden del día') {
+    divagarDesde = null;
+    return false;
+  }
+  divagarDesde ??= corte + VENTANA_MS / 2;
+  return corte + VENTANA_MS - divagarDesde >= MARGEN_DIVAGAR;
+}
+
 // Solo se consulta con una ventana completa desde el inicio o desde el último aviso de la IA.
 async function comprobar() {
   const corte = Date.now() - VENTANA_MS;
@@ -177,11 +189,12 @@ async function comprobar() {
     cuenta.consultas++;
     cuenta.tokensEntrada += r.uso.input_tokens;
     cuenta.tokensSalida += r.uso.output_tokens;
+    const divagarToca = seguirDivagando(r.accion, corte);
     if (!grabacion || r.accion === 'nada') return;
     if (r.accion === 'cambio de punto') {
       activar(r.punto, corte, true);
       registrar(r.accion, r.tema, 'automático');
-    } else if (r.accion !== 'vueltas' || vueltasConfirmadas(corte)) {
+    } else if (r.accion === 'vueltas' ? vueltasConfirmadas(corte) : r.accion === 'otro punto' || divagarToca) {
       avisar(r.accion, r.tema, r.accion === 'otro punto' ? r.punto : 0);
       if ($('modoPrueba').checked) Object.assign(evento, { entrada: cuerpo, respuesta: { accion: r.accion, punto: r.punto, tema: r.tema } });
     }
@@ -218,7 +231,7 @@ function cadaSegundo() {
 
 // Avisos de la IA: preaviso cancelable de 5 s y, si nadie cancela, voz.
 function avisar(tipo, tema, punto) {
-  vueltaPendiente = null;
+  vueltaPendiente = divagarDesde = null;
   evento = registrar(tipo, tema, 'preaviso');
   $('mensaje').textContent = {
     'vueltas': `Estáis dando vueltas a ${tema || 'lo mismo'}`,

@@ -73,6 +73,15 @@ async function consultar(respuesta) {
   return Math.ceil(s / 10);
 }
 
+// Consulta con `respuesta` hasta que salte el preaviso; devuelve cuántas consultas hicieron falta.
+async function hastaAviso(respuesta, max = 10) {
+  for (let n = 1; n <= max; n++) {
+    await consultar(respuesta);
+    if (await visible('aviso')) return n;
+  }
+  assert.fail('no saltó el aviso');
+}
+
 async function configurar(filas) {
   while ((await pagina.locator('.fila').count()) < filas.length) await pagina.click('#anadir');
   for (const [i, [nombre, tipo]] of filas.entries()) {
@@ -146,8 +155,9 @@ await pagina.click('#irPunto');
 assert.equal(await activo(), 'Calendario');
 assert.deepEqual(await dicho(), []);
 
-// 6. Fuera del orden del día: si nadie cancela, a los 5 s habla la voz y la escucha se pausa mientras habla.
-await consultar({ punto: 0, cerrado: false, vueltas: false, tema: 'la cena de Navidad' });
+// 6. Fuera del orden del día: se permite 1 minuto seguido (6 consultas: la primera cuenta desde la mitad
+// de su ventana). Si nadie cancela, a los 5 s habla la voz y la escucha se pausa mientras habla.
+assert.equal(await hastaAviso({ punto: 0, cerrado: false, vueltas: false, tema: 'la cena de Navidad' }), 6, 'divagar se permite 1 minuto');
 assert.equal(await pagina.textContent('#mensaje'), 'Os habéis salido del orden del día: la cena de Navidad');
 await avanzar(5_000);
 assert.equal(await visible('aviso'), false);
@@ -247,9 +257,16 @@ for (let i = 0; i < 5; i++) await consultar(nada3);
 await consultar(vueltas3);
 assert.equal(await visible('aviso'), false, 'una detección de hace más de 50 s no confirma');
 
-// 15. «Este aviso es erróneo» durante el preaviso: lo cancela, no habla y lo marca.
+// 15. Divagar: si vuelven al punto antes del minuto, el margen se reinicia.
+const fuera = { punto: 0, cerrado: false, vueltas: false, tema: 'el fútbol' };
+for (let i = 0; i < 4; i++) await consultar(fuera);
+await consultar(nada3);
+for (let i = 0; i < 4; i++) await consultar(fuera);
+assert.equal(await visible('aviso'), false, 'volver al punto reinicia el margen de divagar');
+
+// 16. «Este aviso es erróneo» durante el preaviso: lo cancela, no habla y lo marca.
 const antes = (await dicho()).length;
-await consultar({ punto: 0, cerrado: false, vueltas: false, tema: 'el fútbol' });
+assert.equal(await hastaAviso(fuera), 2);
 await pagina.click('#erroneo');
 assert.equal(await visible('aviso'), false);
 assert.equal((await dicho()).length, antes);
