@@ -31,6 +31,7 @@ const rutas = {
 
 createServer(async (req, res) => {
   // Solo la propia página puede pedir claves o consultas: otra web abierta en el navegador no puede gastar saldo.
+  // Chrome solo envía Sec-Fetch-Site a orígenes fiables: la app debe abrirse en 127.0.0.1 o localhost.
   if (req.method === 'POST' && req.headers['sec-fetch-site'] !== 'same-origin') return res.writeHead(403).end();
   const ruta = rutas[`${req.method} ${req.url}`];
   try {

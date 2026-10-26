@@ -70,7 +70,7 @@ const FRASES = {
 const $ = (id) => document.getElementById(id);
 const li = (texto, props) => Object.assign(document.createElement('li'), { textContent: texto, ...props });
 let grabacion, consultas, reloj, preaviso, evento, inicio, desde, inicioPunto, vueltaPendiente = null, divagarDesde = null, ocupado = false, callado = false;
-let frases = [], puntos = [], activo = 0, eventos = [], previsto = 0, deshacer = null;
+let frases = [], puntos = [], activo = 0, eventos = [], previsto = 0, deshacer = null, version = 0; // version: sube con cada cambio de punto
 const cuenta = { consultas: 0, errores: 0, tokensEntrada: 0, tokensSalida: 0 };
 
 const texto = (filtro) => frases.filter(filtro).map((f) => f.texto).join('');
@@ -83,7 +83,7 @@ function pintar() {
   $('puntos').replaceChildren(...puntos.map((p, i) => {
     const r = restante(p);
     const tiempo = r >= 0 ? `quedan ${mmss(r)}` : `${mmss(r)} de más`;
-    return li(`${p.nombre} · ${p.tipo} · ${tiempo}`, { className: i + 1 === activo ? 'activo' : '', onclick: () => i + 1 !== activo && activar(i + 1) });
+    return li(`${p.nombre} · ${p.tipo} · ${tiempo}`, { className: i + 1 === activo ? 'activo' : '', onclick: () => activar(i + 1) });
   }));
   $('eventos').replaceChildren(...eventos.map((e) => li(`${e.hora} · ${e.tipo}${e.tema ? `: ${e.tema}` : ''}${e.resultado ? ` → ${e.resultado}` : ''}${e.erroneo ? ' · erróneo' : ''}`)));
   $('contadores').textContent = Object.entries(cuenta).map(([k, v]) => `${k}: ${v}`).join(' · ');
@@ -102,9 +102,13 @@ function registrar(tipo, tema = '', resultado = '') {
 // El punto empieza al inicio de la ventana en la que se detectó el cambio, para no perder sus primeras frases.
 // Cada punto guarda sus tramos de tiempo, para que al volver a él el detector recuerde lo que se dijo.
 // Al cerrar un punto, lo que le sobra pasa al siguiente; lo que se pasó no se resta (DECISIONES.md, 26-oct).
+// El primer punto empieza al pulsar «Empezar reunión» (DECISIONES.md, 26-oct). Un cambio de punto cancela el preaviso abierto.
 function activar(n, comienzo = Date.now() - VENTANA_MS, cerrado = false) {
+  if (n === activo) return;
+  if (preaviso) cerrarAviso('cancelado');
   const anterior = actual();
-  comienzo = Math.max(comienzo, inicioPunto);
+  comienzo = anterior ? Math.max(comienzo, inicioPunto) : inicioPunto;
+  version++;
   if (anterior) {
     anterior.usado += comienzo - inicioPunto;
     anterior.tramos.push([inicioPunto, comienzo]);
@@ -118,7 +122,7 @@ function activar(n, comienzo = Date.now() - VENTANA_MS, cerrado = false) {
     anterior.presupuesto -= r;
     nuevo.presupuesto += r;
   }
-  if (restante(nuevo) <= CINCO_MIN) nuevo.aviso5 = true; // si ya quedan menos de 5 minutos, ese aviso no se da
+  nuevo.aviso5 = restante(nuevo) <= CINCO_MIN; // si ya quedan 5 minutos o menos, ese aviso no se da; si ganó sobrante, vuelve a darse
   pintar();
 }
 
@@ -202,7 +206,7 @@ async function comprobar() {
   if (ocupado || preaviso || callado || corte < desde) return;
   const cuerpo = ventana(corte);
   if (!cuerpo.ultimo.trim()) return;
-  const g = grabacion;
+  const g = grabacion, v = version;
   ocupado = true;
   try {
     const r = await (await fetch('/api/analizar', { method: 'POST', body: JSON.stringify(cuerpo) })).json();
@@ -210,7 +214,7 @@ async function comprobar() {
     cuenta.consultas++;
     cuenta.tokensEntrada += r.uso.input_tokens;
     cuenta.tokensSalida += r.uso.output_tokens;
-    if (activo !== cuerpo.activo) return; // el organizador cambió de punto mientras se esperaba: respuesta caducada
+    if (version !== v) return; // el punto cambió mientras se esperaba (clic, «Ir al punto» o deshacer): respuesta caducada
     const divagarToca = seguirDivagando(r.accion, corte);
     if (r.accion === 'nada') return;
     if (r.accion === 'cambio de punto') {
@@ -223,7 +227,7 @@ async function comprobar() {
       if ($('modoPrueba').checked) Object.assign(evento, { entrada: cuerpo, respuesta: { accion: r.accion, punto: r.punto, tema: r.tema } });
     }
   } catch {
-    cuenta.errores++;
+    if (grabacion === g) cuenta.errores++;
   } finally {
     ocupado = false;
     pintar();
@@ -289,6 +293,8 @@ $('noAviso').onclick = () => {
 // Deshace el último cambio de punto automático: todo vuelve a como estaba, como si no hubiera ocurrido.
 $('deshacer').onclick = () => {
   if (!deshacer) return;
+  if (preaviso) cerrarAviso('cancelado'); // un preaviso abierto se refería al punto que se deshace
+  version++;
   puntos.forEach((p, i) => Object.assign(p, deshacer.puntos[i]));
   ({ activo, inicioPunto } = deshacer);
   deshacer.evento.resultado += ' · deshecho';
@@ -317,19 +323,20 @@ function decir(tipo) {
 }
 
 // Al terminar se borra la transcripción; quedan en pantalla el registro de avisos y los contadores.
-$('terminar').onclick = async () => {
+$('terminar').onclick = () => {
   clearInterval(consultas);
   clearInterval(reloj);
   if (preaviso) cerrarAviso('reunión terminada');
   speechSynthesis.cancel();
   const g = grabacion;
   grabacion = null;
-  await g.stop().catch(() => {}); // pase lo que pase al parar, hay que borrar la transcripción
+  g.cancel(); // cierra al momento, también durante una reconexión; los resultados finales se borrarían igualmente
   frases = [];
   if ($('modoPrueba').checked) descargar({ fecha: new Date().toISOString(), orden: puntos.map(({ nombre, tipo }) => ({ nombre, tipo })), eventos });
   puntos = [];
   deshacer = null;
   for (const id of ['texto', 'estado']) $(id).textContent = '';
+  $('estado').className = '';
   $('resumen').textContent = `Reunión terminada. Previsto: ${previsto} min · Real: ${((Date.now() - inicio) / 60000).toFixed(1)} min. Transcripción borrada.`;
   for (const id of ['erroneo', 'noAviso', 'terminar']) $(id).hidden = true;
   for (const id of ['preparar', 'empezar']) $(id).hidden = false;

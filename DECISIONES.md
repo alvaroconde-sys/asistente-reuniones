@@ -239,3 +239,25 @@ Formato: decisión · alternativas descartadas · motivo. Lo que decide el CPO v
   - Único fallo: d09 («¿qué entregáis exactamente y en cuánto tiempo?», con el punto activo «Calendario de entrevistas»). Se esperaba el punto 3, «Próximos pasos», y detectó el 1, «Alcance del proyecto». Detecta bien el salto, pero «Ir al punto» señalaría el punto 1.
   - Lectura de IT: el caso es ambiguo, porque los entregables también son alcance. Etiqueta pendiente del criterio del CPO.
 - **Criterio del CPO sobre d09:** preguntar qué se entrega y en cuánto tiempo es «Alcance del proyecto». La etiqueta pasa a punto 1 y el caso se renombra a `d09-otro-punto-entregables`. Con ella, las respuestas de la medición de las 21:21 darían 45/45; no se ha repetido.
+
+### Segunda revisión externa (otro agente, 26-oct, sobre el diff 58ab6ec..c0b2205)
+9 hallazgos. IT los ha comprobado en el código y, los del SDK, en su código fuente.
+
+**Arreglados.** Las pruebas de 1, 4 y 8 se han visto fallar sin el arreglo.
+1. **Deshacer con un preaviso abierto:** la voz avisaba de un salto ya deshecho. Ahora, deshacer o cualquier cambio de punto cancelan el preaviso abierto. `activar()` ignora el punto que ya está activo, también desde «Ir al punto».
+2. **«Terminar» durante una reconexión esperaba el retardo del reintento, hasta 32 s.** Confirmado en el SDK: `stop()` sin sesión espera, mientras que `cancel()` cierra al momento (líneas 2192-2214). Ahora se usa `cancel()`. Sin prueba de reconexión.
+4. **El primer punto empieza al pulsar «Empezar reunión»** (CPO). Antes, lo dicho antes de que la IA lo detectara no pertenecía a ningún punto. Efecto: ese rato cuenta en el tiempo del punto 1.
+5. **«Quedan 5 minutos» no volvía a avisar si el punto ganaba sobrante después de haber avisado.** Ahora se rearma al activar el punto. Sin prueba.
+7. **Un error de red de una consulta en vuelo tras «Terminar» sumaba errores en la reunión siguiente.** Ahora no.
+8. **Dos clics durante una consulta en vuelo** (a otro punto y de vuelta) dejaban pasar la respuesta caducada. Ahora el descarte usa un contador de cambios de punto (`version`), no el número de punto.
+9. **El estado «grave» seguía visible tras «Terminar».** Se limpia.
+
+**No cambiados:**
+- **3. Clic erróneo corregido en menos de 30 s:** hasta 30 s de texto quedan atribuidos al punto equivocado. El CPO decide dejarlo así: caso raro y efecto pequeño. Se revisa si aparece en una reunión.
+- **6. El aviso de transcripción perdida cubre la caída de red, no la red intermitente.** El SDK pone el contador de reintentos a cero en cada reconexión que se abre (líneas 2503 y 2523), así que con una conexión que abre y se cae puede reintentar sin fin sin mostrar el aviso. Riesgo conocido.
+- **Servidor:** Chrome solo envía `Sec-Fetch-Site` a orígenes fiables. La app debe abrirse en 127.0.0.1 o localhost; desde otra IP, todos los POST darían 403. Anotado en `server.js`.
+
+**Riesgos de producto que señala:**
+- Deshacer no caduca: un cambio se puede deshacer 20 minutos después y reasigna ese tiempo y ese texto.
+- Deshacer está junto a otros botones y no pide confirmación.
+- Tras deshacer, el punto real puede oír «quedan 5 minutos» con menos de 5, o «fin de tiempo» al momento.

@@ -227,8 +227,13 @@ await pagina.uncheck('#modoPrueba');
 await configurar([['Uno', 'Small decisions'], ['Dos', 'Small decisions'], ['Tres', 'Small decisions']]);
 await empezar();
 await pagina.evaluate(() => (window.dicho = []));
+decir('Saludo inicial de la reunión B. ');
+await consultar({ punto: 0, cerrado: false, vueltas: false, tema: 'saludos' }); // fuera, sin agotar el margen: no avisa
 await consultar({ punto: 1, cerrado: false, vueltas: false, tema: '' });
 assert.equal(await activo(), 'Uno');
+// El primer punto cuenta desde «Empezar reunión»: recuerda lo dicho antes de que la IA lo detectara.
+await consultar({ punto: 1, cerrado: false, vueltas: false, tema: '' });
+assert.match(peticionesClaude.at(-1).messages[0].content, /ANTERIOR:\nSaludo inicial de la reunión B/);
 
 // 11. A los 10 minutos del punto (quedan 5) avisa una vez; a los 15, fin de tiempo; a los 20, lo repite.
 await avanzar(10 * 60_000);
@@ -300,22 +305,33 @@ const minutos = (t) => Number(t.match(/quedan (\d+):/)[1]);
 await consultar({ punto: 2, cerrado: true, vueltas: false, tema: '' });
 assert.equal(await activo(), 'Dos');
 assert.ok(minutos((await puntos())[1]) >= 27, 'Dos = sus 15 min + lo que le sobraba a Uno');
+// La IA ve que se sigue en «Uno» y abre un preaviso de salto: deshacer también lo cancela y la voz no habla.
+const vocesAntes = (await dicho()).length;
+await consultar({ punto: 1, cerrado: false, vueltas: false, tema: '' });
+assert.equal(await pagina.textContent('#mensaje'), 'Os habéis ido al punto 1 (Uno) sin cerrar el punto 2');
 assert.equal(await pagina.textContent('#deshacer'), 'Deshacer el cambio a «Dos»');
 await pagina.click('#deshacer');
+assert.equal(await visible('aviso'), false);
+await avanzar(6_000);
+assert.equal((await dicho()).length, vocesAntes, 'la voz no avisa de un salto deshecho');
 assert.equal(await activo(), 'Uno');
 const [unoDeshecho, dosDeshecho] = await puntos();
 assert.equal(dosDeshecho, 'Dos · Small decisions · quedan 15:00');
 assert.ok(minutos(unoDeshecho) >= 12, 'Uno recupera su tiempo');
 assert.equal(await visible('deshacer'), false);
-assert.equal((await eventos()).at(-1), 'cambio de punto: Dos → automático · deshecho');
+assert.deepEqual((await eventos()).slice(-2), ['cambio de punto: Dos → automático · deshecho', 'otro punto: Uno → cancelado']);
 
-// 19. Una respuesta lenta que llega después de un clic a otro punto se descarta: ni aviso ni cambio fantasma.
+// 19. Una respuesta lenta que llega después de cambiar de punto se descarta, también si se vuelve al mismo punto
+// antes de que llegue: ni aviso ni cambio fantasma. Tras deshacer, «Uno» recupera lo dicho en él.
 await consultar({ punto: 2, cerrado: false, vueltas: false, tema: '', retraso: 1500 });
+assert.match(peticionesClaude.at(-1).messages[0].content, /ANTERIOR:\nTexto inicial del punto uno/);
 await pagina.click('#puntos li >> nth=1');
+await pagina.click('#puntos li >> nth=0');
 await pagina.waitForTimeout(2000);
-assert.equal(await visible('aviso'), false, 'no avisa de un salto que ya se corrigió');
+assert.equal(await visible('aviso'), false, 'no avisa con una respuesta caducada');
+assert.ok(!(await eventos()).some((e) => e.startsWith('otro punto: Dos')));
+await pagina.click('#puntos li >> nth=1');
 assert.equal(await activo(), 'Dos');
-assert.ok(!(await eventos()).some((e) => e.startsWith('otro punto')));
 
 // 20. Al volver a un punto, el detector recuerda lo que se dijo antes en él, y no lo de otros puntos.
 decir('Texto del punto dos. ');
