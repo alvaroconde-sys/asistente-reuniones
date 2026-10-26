@@ -238,3 +238,4 @@ Formato: decisión · alternativas descartadas · motivo. Lo que decide el CPO v
   - Vueltas 10/10, sin aviso 10/10, cambio de punto 10/10 (con el punto correcto), fuera 5/5, otro punto 9/10. Falsas alarmas 0/20, 0 errores. Tokens: 54.714 de entrada y 1.634 de salida (~0,13 $).
   - Único fallo: d09 («¿qué entregáis exactamente y en cuánto tiempo?», con el punto activo «Calendario de entrevistas»). Se esperaba el punto 3, «Próximos pasos», y detectó el 1, «Alcance del proyecto». Detecta bien el salto, pero «Ir al punto» señalaría el punto 1.
   - Lectura de IT: el caso es ambiguo, porque los entregables también son alcance. Etiqueta pendiente del criterio del CPO.
+- **Criterio del CPO sobre d09:** preguntar qué se entrega y en cuánto tiempo es «Alcance del proyecto». La etiqueta pasa a punto 1 y el caso se renombra a `d09-otro-punto-entregables`. Con ella, las respuestas de la medición de las 21:21 darían 45/45; no se ha repetido.
