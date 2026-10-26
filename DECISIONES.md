@@ -267,3 +267,18 @@ Formato: decisión · alternativas descartadas · motivo. Lo que decide el CPO v
 - **«Ir al punto» deshace** el cambio automático cuando propone volver al punto que estaba activo antes de ese cambio: devuelve el tiempo y el sobrante. Riesgo que encontró IT leyendo el código: antes, ese botón movía de punto sin devolver el sobrante y hacía desaparecer «Deshacer». Basta un clic, porque el preaviso ya da el contexto.
 - **Avisos de tiempo tras deshacer:** se quedan como están. El punto recupera su estado de avisos, así que puede sonar «quedan 5 minutos» con menos de 5 o «fin de tiempo» al momento. Ese mensaje empuja a cerrar, que es la métrica.
 - Pruebas: las tres nuevas (clic suelto, caducidad de la confirmación, «Ir al punto») fallan si se quita su arreglo.
+
+### Tercera revisión externa (26-oct, sobre c0b2205..a90793d)
+El revisor confirmó las pruebas de mutación del informe anterior. Además, con pruebas temporales suyas que no están en `npm test`, reprodujo tres puntos que quedaban sin comprobar:
+- «Terminar» durante el retardo de un reintento cierra en 45 ms.
+- Con 6 conexiones fallidas sale el aviso grande, hacia los 64 s.
+- «Quedan 5 minutos» se rearma cuando un punto gana sobrante.
+
+Hallazgos:
+1. **«Ir al punto» deshacía cambios automáticos antiguos y correctos con un solo clic.** Fallo de la recomendación 2A de IT, que no tuvo en cuenta que deshacer no caduca. Decisión del CPO: volver al punto anterior solo deshace si el cambio de la IA es de hace menos de 2 minutos, y en ese caso el botón lo dice («Volver al punto N (deshacer el cambio)»). Pasado ese plazo, el cambio de la IA se da por bueno y es un salto normal. El botón «Deshacer» sigue sin plazo y con dos clics (decisión 1C).
+2. **Un doble clic en «Deshacer» deshacía el cambio.** Ahora el segundo clic de un doble clic no confirma (`UIEvent.detail`).
+3. **La lista y «Ir al punto» hacían cosas distintas con la misma intención.** Decisión del CPO: misma regla. En esos 2 minutos, pulsar en la lista el punto del que os sacó la IA también deshace el cambio.
+4. **Al aparecer, «Deshacer» movía los demás botones.** «Este aviso es erróneo» se desplazaba 369 px, y «No ha avisado» y «Terminar» bajaban a otra línea (medido en Chromium a 1.280 px). Ahora «Deshacer» va en su propia línea, con el hueco siempre reservado. Con la misma medición, ni los botones ni la lista se mueven.
+5. **Dos aserciones de la prueba fijaban el minuto de exceso** y se habrían roto con una consulta más. Ahora solo comprueban «de más».
+
+Siguen sin una prueba que los proteja: el rearme de «quedan 5 minutos» y el contador de errores por reunión. El revisor quitó ambos arreglos y la prueba siguió pasando.

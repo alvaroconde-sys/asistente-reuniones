@@ -240,7 +240,7 @@ await avanzar(10 * 60_000);
 assert.deepEqual(await dicho(), [FRASES.cinco]);
 await avanzar(5 * 60_000);
 assert.deepEqual(await dicho(), [FRASES.cinco, FRASES.fin]);
-assert.match((await puntos())[0], /^Uno · Small decisions · 0:\d\d de más$/);
+assert.match((await puntos())[0], /^Uno · Small decisions · \d+:\d\d de más$/);
 await avanzar(5 * 60_000);
 assert.deepEqual(await dicho(), [FRASES.cinco, FRASES.fin, FRASES.fin]);
 
@@ -248,7 +248,7 @@ assert.deepEqual(await dicho(), [FRASES.cinco, FRASES.fin, FRASES.fin]);
 await consultar({ punto: 2, cerrado: true, vueltas: false, tema: '' });
 assert.equal(await activo(), 'Dos');
 const [uno, dos] = await puntos();
-assert.match(uno, /^Uno · Small decisions · 5:\d\d de más$/);
+assert.match(uno, /^Uno · Small decisions · \d+:\d\d de más$/);
 assert.match(dos, /^Dos · Small decisions · quedan 14:/);
 
 // 13. Un salto sin cerrar («Ir al punto») no traspasa tiempo: «Dos» conserva el suyo y «Tres» tiene sus 15 min.
@@ -318,7 +318,8 @@ for (let i = 0; i < 2; i++) {
 const vocesAntes = (await dicho()).length;
 await consultar({ punto: 1, cerrado: false, vueltas: false, tema: '' });
 assert.equal(await pagina.textContent('#mensaje'), 'Os habéis ido al punto 1 (Uno) sin cerrar el punto 2');
-await pagina.click('#deshacer');
+await pagina.dblclick('#deshacer');
+assert.equal(await activo(), 'Dos', 'un doble clic no deshace');
 await pagina.click('#deshacer');
 assert.equal(await visible('aviso'), false);
 await avanzar(6_000);
@@ -330,15 +331,33 @@ assert.ok(minutos(unoDeshecho) >= 12, 'Uno recupera su tiempo');
 assert.equal(await visible('deshacer'), false);
 assert.deepEqual((await eventos()).slice(-2), ['cambio de punto: Dos → automático · deshecho', 'otro punto: Uno → cancelado']);
 
-// 18b. «Ir al punto» hacia el punto del que sacó la IA deshace el cambio: «Dos» devuelve el sobrante a «Uno».
+// 18b. Antes de 2 minutos, volver al punto del que sacó la IA deshace el cambio, desde el preaviso (con un
+// botón que lo dice) y desde la lista: «Dos» devuelve el sobrante.
+const dosEntero = 'Dos · Small decisions · quedan 15:00';
 await consultar({ punto: 2, cerrado: true, vueltas: false, tema: '' });
 assert.ok(minutos((await puntos())[1]) >= 25);
 await consultar({ punto: 1, cerrado: false, vueltas: false, tema: '' });
+assert.equal(await pagina.textContent('#irPunto'), 'Volver al punto 1 (deshacer el cambio)');
 await pagina.click('#irPunto');
 assert.equal(await activo(), 'Uno');
-assert.equal((await puntos())[1], 'Dos · Small decisions · quedan 15:00');
+assert.equal((await puntos())[1], dosEntero);
 assert.equal(await visible('deshacer'), false);
 assert.deepEqual((await eventos()).slice(-2), ['cambio de punto: Dos → automático · deshecho', 'otro punto: Uno → ir al punto']);
+await consultar({ punto: 2, cerrado: true, vueltas: false, tema: '' });
+await pagina.click('#puntos li >> nth=0');
+assert.equal(await activo(), 'Uno');
+assert.equal((await puntos())[1], dosEntero, 'desde la lista también deshace');
+assert.equal((await eventos()).at(-1), 'cambio de punto: Dos → automático · deshecho');
+
+// 18c. Pasados 2 minutos, el cambio de la IA se da por bueno: «Ir al punto» es un salto normal y «Dos» conserva el sobrante.
+await consultar({ punto: 2, cerrado: true, vueltas: false, tema: '' });
+await avanzar(2 * 60_000);
+await consultar({ punto: 1, cerrado: false, vueltas: false, tema: '' });
+assert.equal(await pagina.textContent('#irPunto'), 'Ir al punto 1');
+await pagina.click('#irPunto');
+assert.equal(await activo(), 'Uno');
+assert.notEqual((await puntos())[1], dosEntero, 'no deshace un cambio de hace más de 2 minutos');
+assert.deepEqual((await eventos()).slice(-2), ['cambio de punto: Dos → automático', 'otro punto: Uno → ir al punto']);
 
 // 19. Una respuesta lenta que llega después de cambiar de punto se descarta, también si se vuelve al mismo punto
 // antes de que llegue: ni aviso ni cambio fantasma. Tras deshacer, «Uno» recupera lo dicho en él.

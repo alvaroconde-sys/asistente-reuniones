@@ -33,12 +33,12 @@
 </fieldset>
 <p>
   <button id="empezar">Empezar reunión</button>
-  <button id="deshacer" hidden></button>
   <button id="erroneo" hidden>Este aviso es erróneo</button>
   <button id="noAviso" hidden>No ha avisado</button>
   <button id="terminar" hidden>Terminar</button>
   <span id="estado"></span>
 </p>
+<p><button id="deshacer" style="visibility: hidden">Deshacer</button></p> <!-- su hueco está siempre reservado: al aparecer no mueve los demás botones -->
 <ol id="puntos" title="Pulsa un punto para corregir el punto activo"></ol>
 <div id="aviso" hidden>
   <span id="mensaje"></span>. Aviso en <strong id="segundos"></strong> s<br>
@@ -59,6 +59,7 @@ const PREAVISO_S = 5;      // segundos que tiene el organizador para cancelar un
 const CINCO_MIN = 5 * 60_000;
 const MARGEN_DIVAGAR = 60_000; // se permite divagar 1 minuto seguido (DECISIONES.md, 26-oct)
 const CONFIRMAR_MS = 5_000; // «Deshacer» pide un segundo clic en este plazo
+const VOLVER_MS = 2 * 60_000; // volver al punto anterior deshace el cambio de la IA solo en este plazo (CPO, 26-oct)
 const TIPOS = { 'Small decisions': 15, 'Big decisions': 30, 'Save the world': 60 }; // minutos por punto
 const FRASES = {
   'cinco minutos': 'Quedan 5 minutos para finalizar el tiempo de este punto del orden del día, por favor, vayan sacando conclusiones para cerrarlo',
@@ -79,17 +80,19 @@ const actual = () => puntos[activo - 1];
 // Tiempo que le queda a un punto; negativo si se ha pasado.
 const restante = (p) => p.presupuesto - p.usado - (p === actual() ? Date.now() - inicioPunto : 0);
 const confirmando = () => Date.now() - (deshacer?.pedido ?? 0) < CONFIRMAR_MS;
+// Ir, a mano, al punto del que la IA acaba de sacaros: es deshacer ese cambio (recupera tiempo y sobrante).
+const volviendo = (n) => deshacer?.activo === n && Date.now() - deshacer.hecho < VOLVER_MS;
 const mmss = (ms) => { const s = Math.floor(Math.abs(ms) / 1000); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; };
 
 function pintar() {
   $('puntos').replaceChildren(...puntos.map((p, i) => {
     const r = restante(p);
     const tiempo = r >= 0 ? `quedan ${mmss(r)}` : `${mmss(r)} de más`;
-    return li(`${p.nombre} · ${p.tipo} · ${tiempo}`, { className: i + 1 === activo ? 'activo' : '', onclick: () => activar(i + 1) });
+    return li(`${p.nombre} · ${p.tipo} · ${tiempo}`, { className: i + 1 === activo ? 'activo' : '', onclick: () => (volviendo(i + 1) ? deshacerCambio() : activar(i + 1)) });
   }));
   $('eventos').replaceChildren(...eventos.map((e) => li(`${e.hora} · ${e.tipo}${e.tema ? `: ${e.tema}` : ''}${e.resultado ? ` → ${e.resultado}` : ''}${e.erroneo ? ' · erróneo' : ''}`)));
   $('contadores').textContent = Object.entries(cuenta).map(([k, v]) => `${k}: ${v}`).join(' · ');
-  $('deshacer').hidden = !deshacer;
+  $('deshacer').style.visibility = deshacer ? 'visible' : 'hidden';
   if (deshacer) $('deshacer').textContent = confirmando() ? '¿Seguro? Pulsa otra vez para deshacer' : `Deshacer el cambio a «${actual().nombre}»`;
 }
 
@@ -222,7 +225,7 @@ async function comprobar() {
     if (r.accion === 'cambio de punto') {
       const previo = { activo, inicioPunto, puntos: puntos.map((p) => ({ ...p, tramos: [...p.tramos] })) };
       activar(r.punto, corte, true);
-      deshacer = { ...previo, evento: registrar(r.accion, r.tema, 'automático') };
+      deshacer = { ...previo, evento: registrar(r.accion, r.tema, 'automático'), hecho: Date.now() };
       if ($('modoPrueba').checked) Object.assign(deshacer.evento, { entrada: cuerpo, respuesta: { accion: r.accion, punto: r.punto, tema: r.tema } });
     } else if (r.accion === 'vueltas' ? vueltasConfirmadas(corte) : r.accion === 'otro punto' || divagarToca) {
       avisar(r.accion, r.tema, r.accion === 'otro punto' ? r.punto : 0);
@@ -268,11 +271,11 @@ function avisar(tipo, tema, punto) {
     'otro punto': `Os habéis ido al punto ${punto} (${tema}) sin cerrar el punto ${activo}`,
     'fuera del orden del día': `Os habéis salido del orden del día: ${tema || 'otro asunto'}`,
   }[tipo];
+  const vuelve = volviendo(punto); // el botón hace lo que dice, aunque el plazo venza durante el preaviso
   $('irPunto').hidden = !punto;
-  $('irPunto').textContent = `Ir al punto ${punto}`;
-  // Volver al punto del que acaba de sacaros la IA es deshacer ese cambio: recupera tiempo y sobrante.
+  $('irPunto').textContent = vuelve ? `Volver al punto ${punto} (deshacer el cambio)` : `Ir al punto ${punto}`;
   $('irPunto').onclick = () => {
-    if (deshacer?.activo === punto) return deshacerCambio('ir al punto');
+    if (vuelve) return deshacerCambio('ir al punto');
     cerrarAviso('ir al punto');
     activar(punto);
   };
@@ -309,8 +312,8 @@ function deshacerCambio(resultadoAviso = 'cancelado') {
   pintar();
 }
 // Un clic suelto no deshace: pide un segundo clic en 5 s.
-$('deshacer').onclick = () => {
-  if (!deshacer) return;
+$('deshacer').onclick = (e) => {
+  if (!deshacer || e.detail > 1) return; // el segundo clic de un doble clic no confirma
   if (!confirmando()) { deshacer.pedido = Date.now(); return pintar(); }
   deshacerCambio();
 };
