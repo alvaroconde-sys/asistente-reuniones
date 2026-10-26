@@ -160,3 +160,5 @@ Formato: decisión · alternativas descartadas · motivo. Lo que decide el CPO v
 - **Pendiente para cerrar la V1:**
   - Reunión real de ~60 min: estabilidad, coste por hora, falsas alarmas que suenan por hora y lo que se escapa.
   - Ver en vivo los avisos de tiempo (5 minutos y fin).
+- **La voz no aparece en la transcripción** (CPO, 26-oct): la pausa de la escucha mientras habla funciona.
+- **Sin margen al inicio** (CPO). Descartado: no avisar de divagar en los primeros minutos. Motivo: el organizador pulsa «Empezar reunión» cuando ya ha terminado la charla informal.
