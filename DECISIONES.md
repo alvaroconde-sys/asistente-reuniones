@@ -162,3 +162,15 @@ Formato: decisión · alternativas descartadas · motivo. Lo que decide el CPO v
   - Ver en vivo los avisos de tiempo (5 minutos y fin).
 - **La voz no aparece en la transcripción** (CPO, 26-oct): la pausa de la escucha mientras habla funciona.
 - **Sin margen al inicio** (CPO). Descartado: no avisar de divagar en los primeros minutos. Motivo: el organizador pulsa «Empezar reunión» cuando ya ha terminado la charla informal.
+
+### Primera reunión real (CPO, 26-oct, 12:45–13:09; 24,4 min)
+- **Dato:**
+  - Eventos: 2 cambios de punto automáticos, 1 aviso de «quedan 5 minutos», 6 de vueltas, 1 de fuera del orden del día y 3 pulsaciones de «No ha avisado».
+  - 123 consultas sin errores: 381.769 tokens de entrada y 3.841 de salida.
+  - Previsto 30 min, real 24,4 min.
+- **El CPO informa** de avisos de divagar y de vueltas que no correspondían. Como mínimo hay 2 falsos en 24,4 min, unos 4,9 por hora: **no cumple el umbral** de 1 alarma falsa que suene por hora. Falta saber cuáles de los 7 eran falsos.
+- **Coste real:** ~0,80 $, es decir, ~1,97 $/h y ~0,0065 $ por consulta, con 3.104 tokens de entrada de media por consulta. Es el doble de la estimación de ~1 $/h, que salía de pruebas de 2 min y se dio como suelo: lo que se manda como «lo anterior» crece mientras dura el punto.
+- **Lectura** (hipótesis):
+  - Los casos de prueba (45/45) no representan una reunión real. Son textos limpios escritos por IT, ya señalado como riesgo el 24-oct. En una conversación real se vuelve sobre lo dicho para matizarlo, y eso se lee como vueltas.
+  - La ventana de 30 s lo agrava: en 30 s de habla es normal repetir lo que se acaba de decir.
+  - Divagar se juzga contra el texto literal del punto, y no contra el propósito de la reunión.
