@@ -234,3 +234,7 @@ Formato: decisión · alternativas descartadas · motivo. Lo que decide el CPO v
 - **El exceso ya no se resta: solo se suma el sobrante.** Revierte la decisión del 25-oct. Consecuencia: la reunión puede durar más de lo previsto; lo mostrará «Previsto / Real».
 - **Las vueltas se miden contra todo el punto:** se mantiene y se confirma el miércoles.
 - **Al volver a un punto, el detector recuerda lo que se dijo en él.** Cada punto guarda sus tramos de tiempo, y «lo anterior» incluye todas sus visitas, sin lo de otros puntos. Coste: más texto por consulta al volver a un punto largo.
+- **Medición con punto esperado** (CPO, 26-oct, 21:21; Sonnet sin pensar): 44/45.
+  - Vueltas 10/10, sin aviso 10/10, cambio de punto 10/10 (con el punto correcto), fuera 5/5, otro punto 9/10. Falsas alarmas 0/20, 0 errores. Tokens: 54.714 de entrada y 1.634 de salida (~0,13 $).
+  - Único fallo: d09 («¿qué entregáis exactamente y en cuánto tiempo?», con el punto activo «Calendario de entrevistas»). Se esperaba el punto 3, «Próximos pasos», y detectó el 1, «Alcance del proyecto». Detecta bien el salto, pero «Ir al punto» señalaría el punto 1.
+  - Lectura de IT: el caso es ambiguo, porque los entregables también son alcance. Etiqueta pendiente del criterio del CPO.
