@@ -213,7 +213,7 @@ assert.match(porTipo('vueltas').entrada.ultimo, /Seguimos hablando/);
 assert.equal(porTipo('fuera del orden del día').erroneo, true);
 assert.equal(porTipo('fuera del orden del día').entrada.activo, 2);
 assert.ok(porTipo('no ha avisado').entrada.ultimo, 'también guarda la ventana de «No ha avisado»');
-assert.equal(porTipo('cambio de punto').entrada, undefined, 'los cambios de punto no guardan texto');
+assert.ok(porTipo('cambio de punto').entrada.ultimo, 'los cambios automáticos guardan lo que vio la IA, para revisar cierres erróneos');
 await avanzar(2_000);
 assert.equal(await pagina.evaluate(() => fetch(window.ultimoBlob).then(() => 'en memoria', () => 'liberado')), 'liberado', 'la copia del fichero se libera');
 assert.equal(await pagina.textContent('#texto'), '');
@@ -239,19 +239,19 @@ assert.match((await puntos())[0], /^Uno · Small decisions · 0:\d\d de más$/);
 await avanzar(5 * 60_000);
 assert.deepEqual(await dicho(), [FRASES.cinco, FRASES.fin, FRASES.fin]);
 
-// 12. Al cerrar el punto, su exceso (~5 min) se resta del siguiente: «Dos» empieza con ~10 min, no 15.
+// 12. Al cerrar el punto con ~5 min de exceso, el exceso no se resta: «Dos» empieza con sus 15 min.
 await consultar({ punto: 2, cerrado: true, vueltas: false, tema: '' });
 assert.equal(await activo(), 'Dos');
 const [uno, dos] = await puntos();
-assert.equal(uno, 'Uno · Small decisions · quedan 0:00');
-assert.match(dos, /^Dos · Small decisions · quedan 9:/);
+assert.match(uno, /^Uno · Small decisions · 5:\d\d de más$/);
+assert.match(dos, /^Dos · Small decisions · quedan 14:/);
 
 // 13. Un salto sin cerrar («Ir al punto») no traspasa tiempo: «Dos» conserva el suyo y «Tres» tiene sus 15 min.
 await consultar({ punto: 3, cerrado: false, vueltas: false, tema: '' });
 await pagina.click('#irPunto');
 assert.equal(await activo(), 'Tres');
 const [, dos2, tres] = await puntos();
-assert.match(dos2, /quedan 9:/);
+assert.match(dos2, /quedan 14:/);
 assert.match(tres, /quedan 14:/);
 
 // 14. La confirmación de vueltas caduca: una segunda detección a más de 50 s de la primera no avisa.
@@ -295,7 +295,21 @@ await pagina.click('#puntos li >> nth=0');
 await consultar({ punto: 1, cerrado: false, vueltas: false, tema: '' });
 assert.match(peticionesClaude.at(-1).messages[0].content, /ANTERIOR:\nTexto inicial/);
 
-// 18. Una respuesta lenta que llega después de un clic a otro punto se descarta: ni aviso ni cambio fantasma.
+// 18. Cambio automático con sobrante: «Dos» gana lo que le sobra a «Uno». «Deshacer» lo deja como estaba.
+const minutos = (t) => Number(t.match(/quedan (\d+):/)[1]);
+await consultar({ punto: 2, cerrado: true, vueltas: false, tema: '' });
+assert.equal(await activo(), 'Dos');
+assert.ok(minutos((await puntos())[1]) >= 27, 'Dos = sus 15 min + lo que le sobraba a Uno');
+assert.equal(await pagina.textContent('#deshacer'), 'Deshacer el cambio a «Dos»');
+await pagina.click('#deshacer');
+assert.equal(await activo(), 'Uno');
+const [unoDeshecho, dosDeshecho] = await puntos();
+assert.equal(dosDeshecho, 'Dos · Small decisions · quedan 15:00');
+assert.ok(minutos(unoDeshecho) >= 12, 'Uno recupera su tiempo');
+assert.equal(await visible('deshacer'), false);
+assert.equal((await eventos()).at(-1), 'cambio de punto: Dos → automático · deshecho');
+
+// 19. Una respuesta lenta que llega después de un clic a otro punto se descarta: ni aviso ni cambio fantasma.
 await consultar({ punto: 2, cerrado: false, vueltas: false, tema: '', retraso: 1500 });
 await pagina.click('#puntos li >> nth=1');
 await pagina.waitForTimeout(2000);
@@ -303,7 +317,15 @@ assert.equal(await visible('aviso'), false, 'no avisa de un salto que ya se corr
 assert.equal(await activo(), 'Dos');
 assert.ok(!(await eventos()).some((e) => e.startsWith('otro punto')));
 
-// 19. Una respuesta lenta que llega después de «Terminar» y de empezar otra reunión no se aplica a la nueva.
+// 20. Al volver a un punto, el detector recuerda lo que se dijo antes en él, y no lo de otros puntos.
+decir('Texto del punto dos. ');
+await avanzar(40_000);
+await pagina.click('#puntos li >> nth=0');
+await consultar({ punto: 1, cerrado: false, vueltas: false, tema: '' });
+assert.match(peticionesClaude.at(-1).messages[0].content, /ANTERIOR:\nTexto inicial del punto uno/);
+assert.doesNotMatch(peticionesClaude.at(-1).messages[0].content, /Texto del punto dos/);
+
+// 21. Una respuesta lenta que llega después de «Terminar» y de empezar otra reunión no se aplica a la nueva.
 await consultar({ punto: 3, cerrado: true, vueltas: false, tema: '', retraso: 3000 });
 await pagina.click('#terminar');
 await pagina.waitForSelector('#empezar:not([hidden])');
@@ -315,7 +337,7 @@ assert.match(await pagina.textContent('#contadores'), /^consultas: 0 ·/);
 await pagina.click('#terminar');
 await pagina.waitForSelector('#empezar:not([hidden])');
 
-// 20. El servidor rechaza las peticiones POST que no vienen de la propia página.
+// 22. El servidor rechaza las peticiones POST que no vienen de la propia página.
 assert.equal((await fetchReal('http://127.0.0.1:3999/api/analizar', { method: 'POST', body: '{}' })).status, 403);
 
 console.log(`Prueba superada: ${peticionesClaude.length} consultas; configuración, confirmación de vueltas, aviso erróneo, modo prueba, voz con escucha en pausa, tiempos por punto, traspaso al cerrar, respuestas caducadas, contadores, servidor y borrado comprobados.`);

@@ -1,6 +1,6 @@
 # Asistente de reuniones
 
-Asistente para guiar reuniones presenciales. Fase actual: **V1, prueba de concepto del detector**. El organizador configura la reunión: escribe los puntos del orden del día y asigna a cada uno un tipo, que fija su tiempo (Small decisions, 15 min; Big decisions, 30 min; Save the world, 60 min). La app escucha la reunión desde el portátil y avisa por voz cuando quedan 5 minutos de un punto y cuando se acaba su tiempo. Al cerrar un punto, el tiempo que le sobra (o el que se pasó) se suma (o se resta) al siguiente. La IA deduce de qué punto se está hablando y avisa si, durante 30 segundos:
+Asistente para guiar reuniones presenciales. Fase actual: **V1, prueba de concepto del detector**. El organizador configura la reunión: escribe los puntos del orden del día y asigna a cada uno un tipo, que fija su tiempo (Small decisions, 15 min; Big decisions, 30 min; Save the world, 60 min). La app escucha la reunión desde el portátil y avisa por voz cuando quedan 5 minutos de un punto y cuando se acaba su tiempo. Al cerrar un punto, el tiempo que le sobra se suma al siguiente (el exceso no se resta); un cambio de punto automático se puede deshacer. Al volver a un punto, la IA recuerda lo que se dijo en él. La IA deduce de qué punto se está hablando y avisa si, durante 30 segundos:
 - se dan vueltas: se repite lo ya dicho sin dato nuevo ni decisión;
 - se salta a otro punto sin cerrar el actual (ofrece «Ir al punto X»);
 - se habla de algo que no está en el orden del día.

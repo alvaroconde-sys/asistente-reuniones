@@ -223,3 +223,14 @@ Formato: decisión · alternativas descartadas · motivo. Lo que decide el CPO v
 - Restar el exceso puede hacer que un punto empiece agotado y suene «fin de tiempo» nada más entrar.
 - Las vueltas se miden contra todo el punto: cuanto más largo el punto, más coste.
 - Al volver a un punto, el detector no recuerda lo que se dijo antes en él.
+
+### Riesgos de producto: decisiones (CPO, 26-oct, 21:07)
+- **Botón «Deshacer el cambio a «X»»** tras cada cambio de punto automático.
+  - Lo deja todo como si el cambio no hubiera ocurrido: el punto activo, el tiempo de cada punto, el sobrante traspasado y lo que se manda al detector.
+  - El tiempo pasado desde el cambio cuenta para el punto en el que realmente se seguía.
+  - Tras deshacer, se espera una ventana (30 s) antes de volver a consultar.
+  - El botón desaparece con cualquier otro cambio de punto.
+  - En modo prueba, los cambios automáticos guardan también lo que vio la IA, para revisar los cierres erróneos.
+- **El exceso ya no se resta: solo se suma el sobrante.** Revierte la decisión del 25-oct. Consecuencia: la reunión puede durar más de lo previsto; lo mostrará «Previsto / Real».
+- **Las vueltas se miden contra todo el punto:** se mantiene y se confirma el miércoles.
+- **Al volver a un punto, el detector recuerda lo que se dijo en él.** Cada punto guarda sus tramos de tiempo, y «lo anterior» incluye todas sus visitas, sin lo de otros puntos. Coste: más texto por consulta al volver a un punto largo.

@@ -33,6 +33,7 @@
 </fieldset>
 <p>
   <button id="empezar">Empezar reunión</button>
+  <button id="deshacer" hidden></button>
   <button id="erroneo" hidden>Este aviso es erróneo</button>
   <button id="noAviso" hidden>No ha avisado</button>
   <button id="terminar" hidden>Terminar</button>
@@ -69,7 +70,7 @@ const FRASES = {
 const $ = (id) => document.getElementById(id);
 const li = (texto, props) => Object.assign(document.createElement('li'), { textContent: texto, ...props });
 let grabacion, consultas, reloj, preaviso, evento, inicio, desde, inicioPunto, vueltaPendiente = null, divagarDesde = null, ocupado = false, callado = false;
-let frases = [], puntos = [], activo = 0, eventos = [], previsto = 0;
+let frases = [], puntos = [], activo = 0, eventos = [], previsto = 0, deshacer = null;
 const cuenta = { consultas: 0, errores: 0, tokensEntrada: 0, tokensSalida: 0 };
 
 const texto = (filtro) => frases.filter(filtro).map((f) => f.texto).join('');
@@ -86,6 +87,8 @@ function pintar() {
   }));
   $('eventos').replaceChildren(...eventos.map((e) => li(`${e.hora} · ${e.tipo}${e.tema ? `: ${e.tema}` : ''}${e.resultado ? ` → ${e.resultado}` : ''}${e.erroneo ? ' · erróneo' : ''}`)));
   $('contadores').textContent = Object.entries(cuenta).map(([k, v]) => `${k}: ${v}`).join(' · ');
+  $('deshacer').hidden = !deshacer;
+  if (deshacer) $('deshacer').textContent = `Deshacer el cambio a «${actual().nombre}»`;
 }
 
 // Registro en pantalla de avisos y cambios de punto, para revisar después cuáles eran falsos. No se guarda.
@@ -97,18 +100,21 @@ function registrar(tipo, tema = '', resultado = '') {
 }
 
 // El punto empieza al inicio de la ventana en la que se detectó el cambio, para no perder sus primeras frases.
-// Al cerrar un punto, lo que le sobra (o lo que se ha pasado, en negativo) pasa al punto siguiente.
-// Lo hablado antes del punto activo no se manda al detector: las vueltas se miden dentro del punto.
+// Cada punto guarda sus tramos de tiempo, para que al volver a él el detector recuerde lo que se dijo.
+// Al cerrar un punto, lo que le sobra pasa al siguiente; lo que se pasó no se resta (DECISIONES.md, 26-oct).
 function activar(n, comienzo = Date.now() - VENTANA_MS, cerrado = false) {
   const anterior = actual();
   comienzo = Math.max(comienzo, inicioPunto);
-  if (anterior) anterior.usado += comienzo - inicioPunto;
+  if (anterior) {
+    anterior.usado += comienzo - inicioPunto;
+    anterior.tramos.push([inicioPunto, comienzo]);
+  }
   activo = n;
   inicioPunto = comienzo;
-  vueltaPendiente = divagarDesde = null;
+  vueltaPendiente = divagarDesde = deshacer = null;
   const nuevo = actual();
   if (anterior && cerrado) {
-    const r = restante(anterior);
+    const r = Math.max(0, restante(anterior));
     anterior.presupuesto -= r;
     nuevo.presupuesto += r;
   }
@@ -129,7 +135,7 @@ $('empezar').onclick = () => {
   puntos = [...document.querySelectorAll('.fila')]
     .map((f) => ({ nombre: f.querySelector('input').value.trim(), tipo: f.querySelector('select').value }))
     .filter((p) => p.nombre)
-    .map((p) => ({ ...p, presupuesto: TIPOS[p.tipo] * 60_000, usado: 0, aviso5: false, finDicho: 0 }));
+    .map((p) => ({ ...p, presupuesto: TIPOS[p.tipo] * 60_000, usado: 0, tramos: [], aviso5: false, finDicho: 0 }));
   if (!puntos.length) return ($('estado').textContent = 'Escribe el orden del día');
   previsto = puntos.reduce((s, p) => s + TIPOS[p.tipo], 0);
   speechSynthesis.getVoices(); // las voces cargan en segundo plano: así están listas para el primer aviso
@@ -150,6 +156,7 @@ $('empezar').onclick = () => {
   grabacion.on('error', (e) => ($('estado').textContent = `Error: ${e.message}`));
   eventos = [];
   activo = 0;
+  deshacer = null;
   for (const k in cuenta) cuenta[k] = 0;
   inicio = desde = inicioPunto = Date.now();
   vueltaPendiente = divagarDesde = null;
@@ -161,8 +168,13 @@ $('empezar').onclick = () => {
   pintar();
 };
 
-// Lo que se manda al detector: orden del día, punto activo, lo hablado antes en el punto y el último tramo.
-const ventana = (corte) => ({ orden: puntos.map((p) => p.nombre), activo, antes: texto((f) => f.t >= inicioPunto && f.t < corte), ultimo: texto((f) => f.t >= corte) });
+// Lo que se manda al detector: orden del día, punto activo, lo hablado antes en ese punto (también en visitas
+// anteriores) y el último tramo.
+function ventana(corte) {
+  const tramos = actual()?.tramos ?? [];
+  const delPunto = (t) => t < corte && (t >= inicioPunto || tramos.some(([a, b]) => t >= a && t < b));
+  return { orden: puntos.map((p) => p.nombre), activo, antes: texto((f) => delPunto(f.t)), ultimo: texto((f) => f.t >= corte) };
+}
 
 // Vueltas solo se avisa si la detectan dos consultas cuyas ventanas no se solapan: la segunda entre 30 y 50 s
 // después de la primera (DECISIONES.md, 26-oct). Así hacen falta ~60 s de vueltas.
@@ -202,8 +214,10 @@ async function comprobar() {
     const divagarToca = seguirDivagando(r.accion, corte);
     if (r.accion === 'nada') return;
     if (r.accion === 'cambio de punto') {
+      const previo = { activo, inicioPunto, puntos: puntos.map((p) => ({ ...p, tramos: [...p.tramos] })) };
       activar(r.punto, corte, true);
-      registrar(r.accion, r.tema, 'automático');
+      deshacer = { ...previo, evento: registrar(r.accion, r.tema, 'automático') };
+      if ($('modoPrueba').checked) Object.assign(deshacer.evento, { entrada: cuerpo, respuesta: { accion: r.accion, punto: r.punto, tema: r.tema } });
     } else if (r.accion === 'vueltas' ? vueltasConfirmadas(corte) : r.accion === 'otro punto' || divagarToca) {
       avisar(r.accion, r.tema, r.accion === 'otro punto' ? r.punto : 0);
       if ($('modoPrueba').checked) Object.assign(evento, { entrada: cuerpo, respuesta: { accion: r.accion, punto: r.punto, tema: r.tema } });
@@ -272,6 +286,16 @@ $('noAviso').onclick = () => {
   const e = registrar('no ha avisado');
   if ($('modoPrueba').checked) e.entrada = ventana(Date.now() - VENTANA_MS);
 };
+// Deshace el último cambio de punto automático: todo vuelve a como estaba, como si no hubiera ocurrido.
+$('deshacer').onclick = () => {
+  if (!deshacer) return;
+  puntos.forEach((p, i) => Object.assign(p, deshacer.puntos[i]));
+  ({ activo, inicioPunto } = deshacer);
+  deshacer.evento.resultado += ' · deshecho';
+  deshacer = vueltaPendiente = divagarDesde = null;
+  desde = Date.now(); // una ventana de margen antes de volver a consultar
+  pintar();
+};
 // Marca como erróneo el último aviso de la IA; si aún está en preaviso, además lo cancela.
 $('erroneo').onclick = () => {
   if (!evento || evento.erroneo) return;
@@ -304,6 +328,7 @@ $('terminar').onclick = async () => {
   frases = [];
   if ($('modoPrueba').checked) descargar({ fecha: new Date().toISOString(), orden: puntos.map(({ nombre, tipo }) => ({ nombre, tipo })), eventos });
   puntos = [];
+  deshacer = null;
   for (const id of ['texto', 'estado']) $(id).textContent = '';
   $('resumen').textContent = `Reunión terminada. Previsto: ${previsto} min · Real: ${((Date.now() - inicio) / 60000).toFixed(1)} min. Transcripción borrada.`;
   for (const id of ['erroneo', 'noAviso', 'terminar']) $(id).hidden = true;
