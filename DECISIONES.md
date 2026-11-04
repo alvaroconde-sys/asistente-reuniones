@@ -292,4 +292,9 @@ Siguen sin una prueba que los proteja: el rearme de «quedan 5 minutos» y el co
 - **Criterio del CPO:** dar cifras de negocio de la semana durante la ronda de una persona corresponde al punto del informe semanal (caso r01).
 - **Casos nuevos:** 5 (r01–r05), con nombres, empresas y cifras inventados. El fichero original no se sube al repositorio, porque incluye a un cliente que no estaba en la reunión y cifras internas.
 - **Riesgo abierto: puntos definidos por quién habla.** La transcripción no identifica a quien habla, porque no está activada la diarización de Soniox. La IA solo puede distinguir dos rondas de personas por el contenido o si alguien dice el nombre.
-- **Pendiente:** los contadores (coste) y la línea «Previsto / Real» de la pantalla.
+- **Duración** (pantalla del CPO): previsto 90 min, real 51,9 min. El sprint se cortó por una llamada a las 13:00 (se oye en la transcripción), así que la duración no mide el efecto de la app.
+- **Coste** (contadores del CPO y precios de Sonnet 5.5 en la documentación de Anthropic, consultada el 4-nov: 2 $ por millón de tokens de entrada y 10 $ por millón de salida):
+  - 298 consultas, 0 errores, 1.130.243 tokens de entrada y 9.859 de salida.
+  - Unos 2,36 $ en total, que son 2,73 $/h. En la primera reunión real fueron 1,97 $/h.
+  - La entrada supone el 96 % del coste. De media, cada consulta manda 3.793 tokens, frente a 3.104 en la primera reunión.
+- **Pendiente (CPO):** decidir si se abarata ya (caché de prompt o Haiku) o después de más reuniones.
