@@ -282,3 +282,14 @@ Hallazgos:
 5. **Dos aserciones de la prueba fijaban el minuto de exceso** y se habrían roto con una consulta más. Ahora solo comprueban «de más».
 
 Siguen sin una prueba que los proteja: el rearme de «quedan 5 minutos» y el contador de errores por reunión. El revisor quitó ambos arreglos y la prueba siguió pasando.
+
+## 2026-11-04
+
+### Reunión de prueba real (CPO, 4-nov; datos del fichero del modo prueba)
+- **Orden del día:** cuatro puntos. Dos rondas de personas (Small decisions), el informe semanal (Big) y el sprint planning (Big). Previsto: 90 min, sumando lo que fija cada tipo. Según el fichero, el primer evento fue a las 12:07 y la reunión terminó a las 12:58.
+- **Avisos de la IA:** 4. Dos de otro punto, uno de vueltas y uno de fuera del orden del día. Los 4 son correctos según el CPO, también el que quedó marcado como erróneo en el registro. Avisos registrados con «No ha avisado»: 0.
+- **Cambios de punto automáticos:** 3, ninguno deshecho; dos de ellos con cierre explícito en la transcripción. El paso del punto 1 al 2 lo hizo el CPO en la lista, adelantándose a la IA, así que no está medido si la IA lo habría detectado.
+- **Criterio del CPO:** dar cifras de negocio de la semana durante la ronda de una persona corresponde al punto del informe semanal (caso r01).
+- **Casos nuevos:** 5 (r01–r05), con nombres, empresas y cifras inventados. El fichero original no se sube al repositorio, porque incluye a un cliente que no estaba en la reunión y cifras internas.
+- **Riesgo abierto: puntos definidos por quién habla.** La transcripción no identifica a quien habla, porque no está activada la diarización de Soniox. La IA solo puede distinguir dos rondas de personas por el contenido o si alguien dice el nombre.
+- **Pendiente:** los contadores (coste) y la línea «Previsto / Real» de la pantalla.

@@ -26,11 +26,11 @@ No hace falta `npm install` para usarlo: la página carga el SDK de Soniox desde
 
 ## Medir el detector
 
-`npm run eval` pasa por el detector real los 45 casos de `casos.json`:
-- 10 de vueltas;
-- 10 de salto a otro punto;
-- 5 de asuntos fuera del orden del día;
-- 10 de cambios de punto legítimos;
+`npm run eval` pasa por el detector real los 50 casos de `casos.json`:
+- 11 de vueltas;
+- 11 de salto a otro punto;
+- 6 de asuntos fuera del orden del día;
+- 12 de cambios de punto legítimos;
 - 10 en los que no debe pasar nada.
 
 Lo hace en las 4 configuraciones de `detector.mjs` (Haiku sin pensar, Haiku pensando poco, Haiku pensando normal y Sonnet sin pensar). De cada una muestra:
@@ -40,7 +40,7 @@ Lo hace en las 4 configuraciones de `detector.mjs` (Haiku sin pensar, Haiku pens
 - los errores (respuestas cortadas o no válidas);
 - los tokens y el tiempo medio por consulta.
 
-Cada caso indica su orden del día (de los 7 inventados al principio del fichero), el punto activo, lo dicho antes, el último tramo y la acción esperada. Para medir una sola configuración: `npm run eval -- "sonnet sin pensar"`.
+Cada caso indica su orden del día (de los 8 inventados al principio del fichero), el punto activo, lo dicho antes, el último tramo y la acción esperada. Los casos `r…` salen de una reunión real (4-nov) reescrita con nombres, empresas y cifras inventados. Para medir una sola configuración: `npm run eval -- "sonnet sin pensar"`.
 
 ## Pruebas (desarrollo)
 
