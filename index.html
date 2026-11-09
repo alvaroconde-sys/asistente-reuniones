@@ -209,7 +209,10 @@ const cuenta = { consultas: 0, errores: 0, tokensEntrada: 0, tokensSalida: 0 };
 const texto = (filtro) => frases.filter(filtro).map((f) => f.texto).join('');
 const actual = () => puntos[activo - 1];
 // Tiempo que le queda a un punto; negativo si se ha pasado.
-const restante = (p) => p.presupuesto - p.usado - (p === actual() ? Date.now() - inicioPunto : 0);
+// Punto cuyo reloj corre: el activo o, mientras la IA aún no ha detectado ninguno, el primero, de forma provisional
+// (el primer punto cuenta desde «Empezar reunión»). Solo afecta a lo que se ve: los avisos usan actual().
+const enCurso = () => actual() ?? puntos[0];
+const restante = (p) => p.presupuesto - p.usado - (p === enCurso() ? Date.now() - inicioPunto : 0);
 const confirmando = () => Date.now() - (deshacer?.pedido ?? 0) < CONFIRMAR_MS;
 // Ir, a mano, al punto del que la IA acaba de sacaros: es deshacer ese cambio (recupera tiempo y sobrante).
 const volviendo = (n) => deshacer?.activo === n && Date.now() - deshacer.hecho < VOLVER_MS;
@@ -228,9 +231,9 @@ function pintar() {
     el.onclick = () => (volviendo(n) ? deshacerCambio() : activar(n));
     return el;
   }));
-  const p = actual(), r = p ? restante(p) : 0;
-  $('puntoTipo').textContent = p ? `Punto ${activo} de ${puntos.length} · ${p.tipo}` : 'Escuchando';
-  $('puntoNombre').textContent = p ? p.nombre : 'Detectando de qué punto se habla…';
+  const p = enCurso(), r = p ? restante(p) : 0;
+  $('puntoTipo').textContent = p ? `Punto ${activo || 1} de ${puntos.length} · ${p.tipo}${activo ? '' : ' · detectando el punto'}` : '';
+  $('puntoNombre').textContent = p ? p.nombre : '';
   $('puntoEtiqueta').textContent = !p ? '' : r >= 0 ? 'quedan' : 'de más';
   $('puntoTiempo').textContent = p ? mmss(r) : '';
   $('puntoBarra').style.width = `${p ? 100 * consumido(p) : 0}%`;

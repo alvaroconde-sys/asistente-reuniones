@@ -322,3 +322,9 @@ Siguen sin una prueba que los proteja: el rearme de «quedan 5 minutos» y el co
   - Quitando uno a uno cinco de los añadidos (marcas del preaviso, barra, previsto antes de empezar, filtro de avisos de la IA y estado en español), la prueba falla en los cinco.
   - Capturas en Chromium a 1.280 px, con Soniox, Claude y la voz simulados, de preparar, sin punto detectado, en directo, preaviso, alarma y terminada: las dos tipografías cargan.
   - No comprobado: Chrome real con micrófono y voz, anchos de móvil, y el contraste del texto blanco sobre el botón rojo.
+
+### Reloj provisional al empezar (CPO, 9-nov, opción B)
+- **Problema** (prueba del CPO en Chrome real, 9-nov): hasta que la IA detecta el primer punto, la tarjeta grande no mostraba cuenta atrás ni barra. En esa prueba la transcripción y la voz funcionaron.
+- **Mientras no hay punto detectado, se muestra el reloj del punto 1, marcado «detectando el punto»**, en la tarjeta y en la lista. Descartado: dejarlo vacío (A) y activar de verdad el punto 1 al empezar (C), que cambiaría el detector. Motivo: el primer punto ya cuenta desde «Empezar reunión» (26-oct).
+- **Solo cambia lo que se ve.** El punto 1 no pasa a ser el activo: los avisos de tiempo y lo que se manda al detector no cambian. Si la IA detecta primero otro punto, ese punto se lleva el tiempo transcurrido, como antes.
+- Prueba: con el cambio quitado, `npm test` falla.
