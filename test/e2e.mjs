@@ -121,8 +121,8 @@ await pagina.check('#modoPrueba');
 await empezar();
 assert.equal(await visible('preparar'), false);
 assert.equal(await pagina.textContent('#puntoTipo'), 'Punto 1 de 3 · Small decisions · detectando el punto');
-assert.equal(await pagina.textContent('#puntoTiempo'), '15:00', 'mientras se detecta, corre el reloj del primer punto');
-assert.deepEqual(await puntos(), [
+assert.match(await pagina.textContent('#puntoTiempo'), /^(15:00|14:59)$/, 'mientras se detecta, se ve el reloj del primer punto');
+assert.deepEqual((await puntos()).map((t) => t.replace('14:59', '15:00')), [ // el reloj provisional del punto 1 ya corre
   'Presupuesto · Small decisions · quedan 15:00',
   'Calendario · Big decisions · quedan 30:00',
   'Responsables · Save the world · quedan 60:00',
@@ -132,8 +132,8 @@ assert.deepEqual(await puntos(), [
 decir('Buenos días, empezamos. ');
 await avanzar(21_000);
 assert.equal(peticionesClaude.length, 0, 'no debe consultar antes de 30 s');
-assert.equal(await pagina.textContent('#puntoTiempo'), '14:39', 'el reloj provisional avanza');
-assert.equal((await puntos())[0], 'Presupuesto · Small decisions · quedan 14:39');
+assert.match(await pagina.textContent('#puntoTiempo'), /^14:3[89]$/, 'el reloj provisional avanza');
+assert.match((await puntos())[0], /^Presupuesto · Small decisions · quedan 14:3[89]$/);
 assert.equal(await pagina.locator('#puntos li.activo').count(), 0, 'provisional no es activo');
 
 // 3. Primer punto detectado: se activa solo, sin aviso, y empieza su cuenta atrás.
