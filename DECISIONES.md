@@ -320,3 +320,37 @@ Siguen sin una prueba que los proteja: el rearme de «quedan 5 minutos» y el co
 - **Los tokens del resumen se muestran aparte** y no se suman a los contadores del detector. Motivo: no alterar el coste por hora que se está midiendo (decisión del 9-nov sobre abaratar).
 - **La llamada a la API de Claude pasa a una función común** (`claude()` en `detector.mjs`) que usan el detector y el resumen. El detector manda lo mismo que antes; `npm run eval` no se ha repetido tras el cambio.
 - **Verificación:** `npm test` comprueba lo que se manda (orden del día y transcripción de todos los puntos), el fallo con reintento, el descarte, la edición, «Copiar», «Descargar» (se descarga lo corregido), que un resumen lento no aparece en la reunión siguiente y que una reunión sin texto no pide resumen. Las pruebas del resumen caducado y del reintento se han visto fallar al quitar su protección.
+### Diseño de la página (CPO)
+- **Aspecto nuevo para enseñarlo a los compañeros que lo usarán.** Se parte de una maqueta de cuatro pantallas (preparar, en directo, preaviso y terminada) hecha en un lienzo de Claude, fuera del repositorio.
+- **Colores del manual de marca de Laguinda, sin logotipo ni guinda** (CPO). Motivo: el proyecto es propio, no de Laguinda.
+- **Titulares en Archivo (ancha, peso 800) en lugar de Ginto Nord** (CPO, opción A). Descartado: usar Ginto Nord sin subirla, o consultar antes su licencia. Motivo: el repositorio es público y la licencia de Ginto Nord no se ha consultado. Texto corrido en DM Sans.
+- **Las tipografías se guardan en `fonts/`** (CPO, opción B). Descartado: cargarlas desde Google Fonts. Motivo: no sumar otro servicio externo al SDK de Soniox. Licencia de las dos: SIL Open Font License 1.1, leída el 9-nov en el fichero LICENSE de los paquetes npm `@fontsource-variable/dm-sans` y `@fontsource-variable/archivo` (versión 5.3.0), de donde salen los ficheros; el texto de cada licencia va junto a ellos.
+- **Añadidos respecto a la app anterior** (CPO, alcance B): barra de progreso del punto activo, tiempo previsto antes de empezar, número de avisos de la IA y de marcados como erróneos al terminar, diferencia entre previsto y real, y las marcas «sin cerrar» y «se habla de esto» en el orden del día mientras está abierto un preaviso de salto a otro punto.
+- **«Avisos de la IA» cuenta los preavisos de vueltas, otro punto y fuera del orden del día**, también los cancelados. No cuenta los avisos de tiempo ni los cambios de punto.
+
+### Técnicas
+- **Solo cambian `index.html` y dos rutas en `server.js`** para servir las tipografías. Sin dependencias nuevas.
+- **El tipo de punto sigue siendo un desplegable** · tres botones por fila, como en la maqueta · hace lo mismo con menos código.
+- **«Reunión terminada» es un bloque encima de la preparación de la siguiente reunión** · una pantalla aparte con «Preparar otra reunión» · no añade navegación.
+- **La lista de puntos y el registro conservan su texto** («Nombre · tipo · quedan 14:05»): los separadores van en el marcado y no se muestran. Motivo: las pruebas existentes siguen comprobando lo mismo.
+- **Las marcas «ahora», «sin cerrar» y «se habla de esto» las pone el CSS** según la clase del punto; no forman parte del texto.
+- **El estado de la escucha se muestra en español** (Escuchando, En pausa, Conectando, Reconectando); los demás estados del SDK salen tal cual.
+- **Los contadores de consultas y tokens se mantienen**, en pequeño bajo el registro. Motivo: hacen falta para la decisión de coste pendiente (9-nov).
+- **Verificación:**
+  - `npm test` pasa con las aserciones nuevas.
+  - Quitando uno a uno cinco de los añadidos (marcas del preaviso, barra, previsto antes de empezar, filtro de avisos de la IA y estado en español), la prueba falla en los cinco.
+  - Capturas en Chromium a 1.280 px, con Soniox, Claude y la voz simulados, de preparar, sin punto detectado, en directo, preaviso, alarma y terminada: las dos tipografías cargan.
+  - No comprobado: Chrome real con micrófono y voz, anchos de móvil, y el contraste del texto blanco sobre el botón rojo.
+
+### Reloj provisional al empezar (CPO, 9-nov, opción B)
+- **Problema** (prueba del CPO en Chrome real, 9-nov): hasta que la IA detecta el primer punto, la tarjeta grande no mostraba cuenta atrás ni barra. En esa prueba la transcripción y la voz funcionaron.
+- **Mientras no hay punto detectado, se muestra el reloj del punto 1, marcado «detectando el punto»**, en la tarjeta y en la lista. Descartado: dejarlo vacío (A) y activar de verdad el punto 1 al empezar (C), que cambiaría el detector. Motivo: el primer punto ya cuenta desde «Empezar reunión» (26-oct).
+- **Solo cambia lo que se ve.** El punto 1 no pasa a ser el activo: los avisos de tiempo y lo que se manda al detector no cambian. Si la IA detecta primero otro punto, ese punto se lleva el tiempo transcurrido, como antes.
+- Prueba: con el cambio quitado, `npm test` falla.
+
+### El resumen con el diseño nuevo (9-nov)
+- **El diseño se fusionó en `main` sin tener en cuenta la rama `resumen-reunion`.** IT no miró qué otras ramas había antes de rehacer `index.html`; las dos ramas tocaban la misma zona («Terminar» y el bloque final) y chocaban. Se combinan en la rama `resumen-diseno`.
+- **El resumen es una tarjeta bajo las cifras de «Reunión terminada»**, con el mismo estilo: cuadro editable, «Copiar» y «Descargar», o «Reintentar» y «Descartar» si falla.
+- **«Transcripción borrada» ya no es un texto fijo del bloque final.** Solo sale ahí cuando no hubo nada que resumir; con resumen pendiente lo dice la tarjeta del resumen cuando llega o se descarta. Motivo: el texto fijo habría afirmado un borrado que aún no ha ocurrido.
+- **La duración en la cabecera del resumen usa coma decimal**, igual que en pantalla.
+- Verificación: `npm test` pasa con las pruebas de las dos ramas. No comprobado con la API real: el resumen (ya anotado arriba).
