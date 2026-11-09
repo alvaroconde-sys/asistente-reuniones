@@ -28,6 +28,8 @@ const rutas = {
 
   'POST /api/analizar': async (req) => json(await analizar(JSON.parse(await leer(req)))),
 };
+// Tipografías de la página, guardadas en fonts/ (licencia SIL OFL 1.1) para no depender de terceros.
+for (const f of ['dm-sans.woff2', 'archivo.woff2']) rutas[`GET /fonts/${f}`] = async () => [200, 'font/woff2', await readFile(new URL(`fonts/${f}`, import.meta.url))];
 
 createServer(async (req, res) => {
   // Solo la propia página puede pedir claves o consultas: otra web abierta en el navegador no puede gastar saldo.

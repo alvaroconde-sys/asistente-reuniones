@@ -3,52 +3,181 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Asistente de reuniones — prueba</title>
+<title>Asistente de reuniones</title>
 <style>
-  body { font: 18px/1.5 system-ui, sans-serif; max-width: 760px; margin: 2rem auto; padding: 0 16px; color: #1a1a1a; background: #fff; }
-  body.alarma { background: #c62828; }
-  button, input, select { font: inherit; }
-  button { padding: .6rem 1.4rem; border-radius: 8px; border: 1px solid #888; cursor: pointer; }
-  fieldset { border: 1px solid #ccc; border-radius: 8px; }
-  .fila { display: flex; flex-wrap: wrap; gap: .5rem; margin-bottom: .5rem; }
-  .fila input { flex: 1 1 12rem; min-width: 0; }
-  .fila button { padding: 0 .8rem; }
-  #empezar { background: #1b5e20; color: #fff; border: 0; }
-  #puntos li { cursor: pointer; }
-  #puntos li.activo { font-weight: bold; color: #1b5e20; }
-  #texto { min-height: 6rem; padding: 1rem; background: #f3f3f3; border-radius: 8px; white-space: pre-wrap; }
-  #aviso { margin: 1rem 0; padding: 1.5rem; border-radius: 12px; background: #fff3cd; border: 3px solid #e65100; font-size: 1.4rem; }
-  #aviso button { background: #e65100; color: #fff; border: 0; margin: .5rem .5rem 0 0; }
-  #eventos, #contadores, #resumen { color: #555; font-size: .9rem; }
-  #estado.grave { color: #c62828; font-weight: bold; font-size: 1.3rem; }
+  /* Tipografías libres (SIL OFL 1.1), guardadas en fonts/ para no depender de terceros. */
+  @font-face { font-family: 'DM Sans'; src: url('/fonts/dm-sans.woff2') format('woff2'); font-weight: 100 1000; }
+  @font-face { font-family: 'Archivo'; src: url('/fonts/archivo.woff2') format('woff2'); font-weight: 100 900; font-stretch: 62% 125%; }
+  :root { --tinta: #1D2C47; --tinta2: #2B3953; --fondo: #F1F0E9; --crema: #F7F6F2; --cereza: #FF5354; --mostaza: #FAB81B; --mostaza2: #FFD16D; --gris: #CACDD0; --texto2: #50555C; --sombra: 0 4px 12px rgba(29, 44, 71, .10); }
+  [hidden] { display: none !important; }
+  body { margin: 0; font: 16px/1.45 'DM Sans', system-ui, sans-serif; color: var(--tinta); background: var(--fondo); }
+  body.alarma { background: var(--cereza); }
+  h1, h2, p, ol, ul { margin: 0; padding: 0; }
+  ol, ul { list-style: none; }
+  h2 { font-size: 1.25rem; }
+  button, input, select { font: inherit; color: inherit; }
+  .titular, h1, .cifra { font-family: 'Archivo', system-ui, sans-serif; font-stretch: 125%; font-weight: 800; letter-spacing: -.01em; line-height: 1.05; }
+  h1 { font-size: 2.5rem; }
+  .cifra { font-size: 3.5rem; line-height: 1; }
+  .etiqueta { font-family: 'Archivo', system-ui, sans-serif; font-stretch: 125%; font-weight: 800; font-size: .75rem; letter-spacing: .08em; text-transform: uppercase; }
+  .menor { font-size: .875rem; color: var(--texto2); }
+  .sep { display: none; } /* separadores que solo cuentan en el texto, no en pantalla */
+
+  header { background: var(--tinta); color: #fff; padding: 18px 32px; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 16px; }
+  #estado { padding: 6px 14px; border-radius: 999px; background: var(--tinta2); font-size: .875rem; font-weight: 700; }
+  #estado:empty { display: none; }
+  #estado.recording::before { content: ''; display: inline-block; width: 10px; height: 10px; margin-right: 8px; border-radius: 50%; background: var(--cereza); }
+  #estado.grave { background: var(--cereza); font-size: 1.1rem; }
+
+  main { max-width: 1160px; margin: 0 auto; padding: 32px 32px 64px; }
+  main, section, aside, .pila { display: flex; flex-direction: column; gap: 20px; }
+  main { gap: 32px; }
+  .columnas { display: flex; flex-wrap: wrap; gap: 32px; align-items: flex-start; }
+  .columnas > section { flex: 999 1 560px; min-width: 0; }
+  .columnas > aside { flex: 1 1 320px; min-width: 0; }
+  .fila-flex { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 12px; }
+  .tarjeta { background: #fff; border-radius: 20px; box-shadow: var(--sombra); padding: 24px; }
+  .oscura { background: var(--tinta); color: #fff; }
+  .oscura .menor, .oscura li { color: var(--gris); }
+  .oscura .etiqueta { color: var(--mostaza2); }
+
+  button { height: 48px; padding: 0 22px; border: 0; border-radius: 999px; background: transparent; box-shadow: inset 0 0 0 2px var(--tinta); font-weight: 500; cursor: pointer; }
+  button.oscuro { background: var(--tinta); color: #fff; }
+  button.primario { height: 56px; background: var(--cereza); color: #fff; box-shadow: none; font-size: 1.125rem; font-weight: 700; }
+  button.texto { box-shadow: none; font-weight: 700; padding: 0 16px; }
+
+  /* Preparar */
+  #filas { counter-reset: fila; display: flex; flex-direction: column; gap: 12px; }
+  .fila { counter-increment: fila; display: flex; flex-wrap: wrap; align-items: center; gap: 12px; background: #fff; border-radius: 20px; box-shadow: var(--sombra); padding: 16px; }
+  .fila::before, #puntos li::before { content: counter(fila); width: 36px; height: 36px; flex-shrink: 0; border-radius: 50%; background: var(--tinta); color: #fff; font-weight: 700; display: flex; align-items: center; justify-content: center; }
+  .fila input, .fila select { height: 48px; border: 0; border-radius: 12px; background: var(--crema); padding: 0 16px; }
+  .fila input { flex: 1 1 12rem; min-width: 0; font-weight: 700; }
+  .fila input::placeholder { color: var(--texto2); font-weight: 400; }
+  .fila button { width: 44px; height: 44px; padding: 0; box-shadow: none; color: var(--texto2); }
+  #previstoLista li { display: flex; justify-content: space-between; gap: 12px; font-size: .875rem; }
+  label.tarjeta { display: flex; gap: 12px; align-items: flex-start; padding: 16px; cursor: pointer; }
+  label.tarjeta input { width: 20px; height: 20px; margin: 2px 0 0; flex-shrink: 0; accent-color: var(--tinta); }
+
+  /* Reunión en directo */
+  #punto { border-radius: 28px; padding: 32px; gap: 12px; }
+  #punto .reloj { display: flex; flex-wrap: wrap; align-items: baseline; gap: 16px; font-size: 1.125rem; color: var(--gris); }
+  #puntoTiempo { font-size: 7rem; line-height: .95; color: #fff; }
+  .barra { height: 12px; max-width: 560px; border-radius: 999px; background: var(--tinta2); overflow: hidden; }
+  #puntoBarra { height: 100%; border-radius: 999px; background: var(--cereza); }
+  #punto.apurado #puntoBarra { background: var(--mostaza); }
+  #texto { min-height: 5rem; font-size: 1.125rem; white-space: pre-wrap; }
+  #puntos { counter-reset: fila; display: flex; flex-direction: column; gap: 10px; }
+  #puntos li { counter-increment: fila; display: grid; grid-template-columns: auto 1fr auto; align-items: center; column-gap: 12px; padding: 14px 16px; border-radius: 20px; background: #fff; cursor: pointer; }
+  #puntos li::before { grid-row: span 2; width: 32px; height: 32px; background: transparent; color: var(--texto2); box-shadow: inset 0 0 0 1px var(--gris); }
+  #puntos .nombre { font-weight: 700; }
+  #puntos .tipo { grid-column: 2; grid-row: 2; font-size: .875rem; opacity: .8; }
+  #puntos .tiempo { grid-column: 3; grid-row: 1 / span 2; font-size: .875rem; font-weight: 700; }
+  #puntos li.activo { background: var(--tinta); color: #fff; box-shadow: var(--sombra); }
+  #puntos li.activo::before { background: var(--cereza); color: #fff; box-shadow: none; }
+  #puntos li.activo .tipo::after { content: ' · ahora'; }
+  #puntos li.sincerrar .tipo::after { content: ' · sin cerrar'; }
+  #puntos li.destino { background: var(--mostaza2); box-shadow: inset 0 0 0 2px var(--tinta); }
+  #puntos li.destino .tipo::after { content: ' · se habla de esto'; }
+
+  /* Preaviso de la IA */
+  #aviso { display: flex; flex-wrap: wrap; align-items: center; gap: 32px; padding: 32px; border-radius: 28px; background: var(--mostaza); box-shadow: 0 10px 28px rgba(29, 44, 71, .16); }
+  #aviso .cuenta { width: 152px; height: 152px; flex-shrink: 0; border-radius: 50%; background: var(--tinta); color: var(--gris); font-size: .875rem; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+  #segundos { font-size: 5rem; color: #fff; }
+  #aviso .pila { flex: 1 1 320px; min-width: 0; gap: 16px; }
+  #mensaje { font-size: 2rem; }
+
+  /* Reunión terminada y registro */
+  .cifras { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; }
+  .cifras .tarjeta { display: flex; flex-direction: column; gap: 8px; }
+  #eventos li { display: grid; grid-template-columns: 4rem minmax(8rem, 14rem) 1fr auto; gap: 12px; padding: 14px 0; border-top: 1px solid rgba(29, 44, 71, .12); }
+  #eventos .hora { color: var(--texto2); }
+  #eventos .tipo { font-weight: 700; }
+  #eventos .tipo::first-letter, #eventos .resultado::first-letter { text-transform: uppercase; }
+  #eventos .erroneo { margin-left: 8px; padding: 2px 10px; border-radius: 8px; background: var(--mostaza2); font-size: .875rem; font-weight: 700; }
 </style>
 </head>
 <body>
-<h1>Prueba del detector</h1>
-<fieldset id="preparar">
-  <legend>Orden del día</legend>
-  <div id="filas"></div>
-  <button id="anadir">Añadir punto</button>
-  <p><label><input type="checkbox" id="modoPrueba"> Modo prueba: al terminar, descargar en este portátil el texto que vio la IA en cada aviso (solo con el consentimiento de los asistentes)</label></p>
-</fieldset>
-<p>
-  <button id="empezar">Empezar reunión</button>
-  <button id="erroneo" hidden>Este aviso es erróneo</button>
-  <button id="noAviso" hidden>No ha avisado</button>
-  <button id="terminar" hidden>Terminar</button>
-  <span id="estado"></span>
-</p>
-<p><button id="deshacer" style="visibility: hidden">Deshacer</button></p> <!-- su hueco está siempre reservado: al aparecer no mueve los demás botones -->
-<ol id="puntos" title="Pulsa un punto para corregir el punto activo"></ol>
-<div id="aviso" hidden>
-  <span id="mensaje"></span>. Aviso en <strong id="segundos"></strong> s<br>
-  <button id="cancelar">Cancelar</button>
-  <button id="irPunto"></button>
-</div>
-<div id="texto"></div>
-<ul id="eventos"></ul>
-<p id="contadores"></p>
-<p id="resumen"></p>
+<header><strong>Asistente de reuniones</strong><span id="estado"></span></header>
+<main>
+  <section id="fin" hidden>
+    <div class="pila" style="gap: 8px">
+      <span class="etiqueta">Hecho</span>
+      <h1>Reunión terminada</h1>
+      <p class="menor" style="font-size: 1.125rem">Transcripción borrada. Queda el registro de avisos de esta pantalla.</p>
+    </div>
+    <div class="cifras">
+      <div class="tarjeta"><span class="menor">Previsto</span><span class="cifra" id="finPrevisto"></span></div>
+      <div class="tarjeta oscura"><span class="menor">Real</span><span class="cifra" id="finReal"></span><strong class="etiqueta" id="finDiferencia" style="text-transform: none; letter-spacing: 0"></strong></div>
+      <div class="tarjeta"><span class="menor">Avisos de la IA</span><span class="cifra" id="finAvisos"></span><span class="menor" id="finErroneos"></span></div>
+    </div>
+  </section>
+
+  <div id="vivo" class="columnas" hidden>
+    <section>
+      <div id="aviso" hidden>
+        <div class="cuenta"><span class="titular" id="segundos"></span>segundos</div>
+        <div class="pila">
+          <span class="etiqueta">La voz avisa si nadie cancela</span>
+          <h2 class="titular" id="mensaje"></h2>
+          <div class="fila-flex" style="justify-content: flex-start">
+            <button id="irPunto" class="oscuro"></button>
+            <button id="cancelar">Cancelar</button>
+          </div>
+        </div>
+      </div>
+      <div id="punto" class="tarjeta oscura pila">
+        <span class="etiqueta" id="puntoTipo"></span>
+        <h1 id="puntoNombre"></h1>
+        <p class="reloj"><span id="puntoEtiqueta"></span><span class="titular" id="puntoTiempo"></span></p>
+        <div class="barra"><div id="puntoBarra"></div></div>
+      </div>
+      <p><button id="deshacer" class="texto" style="visibility: hidden">Deshacer</button></p> <!-- su hueco está siempre reservado: al aparecer no mueve los demás botones -->
+      <div class="tarjeta pila" style="gap: 10px">
+        <div class="fila-flex"><strong>Lo último que se ha oído</strong><span class="menor">Se borra al terminar</span></div>
+        <div id="texto"></div>
+      </div>
+      <div class="fila-flex">
+        <span class="fila-flex"><button id="erroneo">Este aviso es erróneo</button><button id="noAviso">No ha avisado</button></span>
+        <button id="terminar" class="oscuro">Terminar</button>
+      </div>
+    </section>
+    <aside>
+      <div class="fila-flex"><h2>Orden del día</h2><span class="menor">Pulsa un punto para corregir</span></div>
+      <ol id="puntos"></ol>
+    </aside>
+  </div>
+
+  <section id="registro" class="tarjeta" hidden>
+    <div class="fila-flex"><h2>Registro de avisos</h2><span class="menor">Revisa cuáles eran falsos. No se guarda: desaparece al cerrar la pestaña.</span></div>
+    <ul id="eventos"></ul>
+    <p id="contadores" class="menor"></p>
+  </section>
+
+  <div id="preparar" class="columnas">
+    <section>
+      <div class="pila" style="gap: 8px">
+        <span class="etiqueta">Antes de empezar</span>
+        <h1>Orden del día</h1>
+        <p class="menor" style="font-size: 1.125rem">Escribe los puntos y elige cuánto tiempo merece cada uno.</p>
+      </div>
+      <div id="filas"></div>
+      <p><button id="anadir">+ Añadir punto</button></p>
+    </section>
+    <aside>
+      <div class="tarjeta oscura pila" style="gap: 16px">
+        <span class="etiqueta">Tiempo previsto</span>
+        <span class="cifra" id="previsto"></span>
+        <ul id="previstoLista" class="pila" style="gap: 8px"></ul>
+        <button id="empezar" class="primario">Empezar reunión</button>
+        <p class="menor">La app escucha desde este portátil y avisa por voz. Al terminar, la transcripción se borra.</p>
+      </div>
+      <label class="tarjeta">
+        <input type="checkbox" id="modoPrueba">
+        <span><strong>Modo prueba</strong><br><span class="menor">Al terminar, descarga en este portátil el texto que vio la IA en cada aviso. Solo con el consentimiento de los asistentes.</span></span>
+      </label>
+    </aside>
+  </div>
+</main>
 
 <script type="module">
 import { SonioxClient } from 'https://cdn.jsdelivr.net/npm/@soniox/client@2.4.0/dist/index.mjs';
@@ -70,9 +199,11 @@ const FRASES = {
 };
 
 const $ = (id) => document.getElementById(id);
-const li = (texto, props) => Object.assign(document.createElement('li'), { textContent: texto, ...props });
+const nodo = (etiqueta, textContent = '', className = '') => Object.assign(document.createElement(etiqueta), { textContent, className });
+const sep = (texto) => nodo('span', texto, 'sep'); // cuenta en el texto del elemento, no se ve
 let grabacion, consultas, reloj, preaviso, evento, inicio, desde, inicioPunto, vueltaPendiente = null, divagarDesde = null, ocupado = false, callado = false;
 let frases = [], puntos = [], activo = 0, eventos = [], previsto = 0, deshacer = null, version = 0; // version: sube con cada cambio de punto
+let destino = 0; // punto al que señala el preaviso abierto de «otro punto»
 const cuenta = { consultas: 0, errores: 0, tokensEntrada: 0, tokensSalida: 0 };
 
 const texto = (filtro) => frases.filter(filtro).map((f) => f.texto).join('');
@@ -82,15 +213,35 @@ const restante = (p) => p.presupuesto - p.usado - (p === actual() ? Date.now() -
 const confirmando = () => Date.now() - (deshacer?.pedido ?? 0) < CONFIRMAR_MS;
 // Ir, a mano, al punto del que la IA acaba de sacaros: es deshacer ese cambio (recupera tiempo y sobrante).
 const volviendo = (n) => deshacer?.activo === n && Date.now() - deshacer.hecho < VOLVER_MS;
+const DE_IA = ['vueltas', 'otro punto', 'fuera del orden del día']; // avisos que decide la IA
+const ESTADOS = { starting: 'Conectando', connecting: 'Conectando', recording: 'Escuchando', paused: 'En pausa', reconnecting: 'Reconectando' };
+const minutos = (n) => `${n.toFixed(1).replace('.', ',')} min`;
+// Parte del tiempo del punto ya consumida, de 0 a 1.
+const consumido = (p) => (p.presupuesto ? Math.min(1, Math.max(0, 1 - restante(p) / p.presupuesto)) : 1);
 const mmss = (ms) => { const s = Math.floor(Math.abs(ms) / 1000); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; };
 
 function pintar() {
   $('puntos').replaceChildren(...puntos.map((p, i) => {
-    const r = restante(p);
-    const tiempo = r >= 0 ? `quedan ${mmss(r)}` : `${mmss(r)} de más`;
-    return li(`${p.nombre} · ${p.tipo} · ${tiempo}`, { className: i + 1 === activo ? 'activo' : '', onclick: () => (volviendo(i + 1) ? deshacerCambio() : activar(i + 1)) });
+    const r = restante(p), n = i + 1;
+    const el = nodo('li', '', [n === activo && 'activo', n === activo && destino && 'sincerrar', n === destino && 'destino'].filter(Boolean).join(' '));
+    el.append(nodo('span', p.nombre, 'nombre'), sep(' · '), nodo('span', p.tipo, 'tipo'), sep(' · '), nodo('span', r >= 0 ? `quedan ${mmss(r)}` : `${mmss(r)} de más`, 'tiempo'));
+    el.onclick = () => (volviendo(n) ? deshacerCambio() : activar(n));
+    return el;
   }));
-  $('eventos').replaceChildren(...eventos.map((e) => li(`${e.hora} · ${e.tipo}${e.tema ? `: ${e.tema}` : ''}${e.resultado ? ` → ${e.resultado}` : ''}${e.erroneo ? ' · erróneo' : ''}`)));
+  const p = actual(), r = p ? restante(p) : 0;
+  $('puntoTipo').textContent = p ? `Punto ${activo} de ${puntos.length} · ${p.tipo}` : 'Escuchando';
+  $('puntoNombre').textContent = p ? p.nombre : 'Detectando de qué punto se habla…';
+  $('puntoEtiqueta').textContent = !p ? '' : r >= 0 ? 'quedan' : 'de más';
+  $('puntoTiempo').textContent = p ? mmss(r) : '';
+  $('puntoBarra').style.width = `${p ? 100 * consumido(p) : 0}%`;
+  $('punto').classList.toggle('apurado', !!p && r > 0 && r <= CINCO_MIN);
+  $('eventos').replaceChildren(...eventos.map((e) => {
+    const el = nodo('li'), resultado = nodo('span', e.resultado, 'resultado');
+    if (e.erroneo) resultado.append(sep(' · '), nodo('span', 'erróneo', 'erroneo'));
+    el.append(nodo('span', e.hora, 'hora'), sep(' · '), nodo('span', e.tipo, 'tipo'), sep(e.tema ? ': ' : ''), nodo('span', e.tema, 'tema'), sep(e.resultado ? ' → ' : ''), resultado);
+    return el;
+  }));
+  $('registro').hidden = !eventos.length && !grabacion;
   $('contadores').textContent = Object.entries(cuenta).map(([k, v]) => `${k}: ${v}`).join(' · ');
   $('deshacer').style.visibility = deshacer ? 'visible' : 'hidden';
   if (deshacer) $('deshacer').textContent = confirmando() ? '¿Seguro? Pulsa otra vez para deshacer' : `Deshacer el cambio a «${actual().nombre}»`;
@@ -131,20 +282,34 @@ function activar(n, comienzo = Date.now() - VENTANA_MS, cerrado = false) {
   pintar();
 }
 
+const leerFilas = () => [...document.querySelectorAll('.fila')]
+  .map((f) => ({ nombre: f.querySelector('input').value.trim(), tipo: f.querySelector('select').value }))
+  .filter((p) => p.nombre);
+
+// Tiempo previsto antes de empezar: la suma de los tipos de los puntos escritos.
+function pintarPrevisto() {
+  const filas = leerFilas();
+  $('previsto').textContent = `${filas.reduce((s, p) => s + TIPOS[p.tipo], 0)} min`;
+  $('previstoLista').replaceChildren(...filas.map((p) => {
+    const el = nodo('li');
+    el.append(nodo('span', p.nombre), nodo('span', `${TIPOS[p.tipo]} min`));
+    return el;
+  }));
+}
+
 function anadirFila() {
-  const fila = Object.assign(document.createElement('div'), { className: 'fila' });
-  fila.innerHTML = `<input placeholder="Punto del orden del día"><select>${Object.entries(TIPOS).map(([t, m]) => `<option value="${t}">${t} · ${m} min</option>`).join('')}</select><button title="Quitar punto">✕</button>`;
-  fila.querySelector('button').onclick = () => fila.remove();
+  const fila = nodo('div', '', 'fila');
+  fila.innerHTML = `<input placeholder="Punto del orden del día" aria-label="Punto del orden del día"><select aria-label="Tipo de punto">${Object.entries(TIPOS).map(([t, m]) => `<option value="${t}">${t} · ${m} min</option>`).join('')}</select><button title="Quitar punto" aria-label="Quitar punto">✕</button>`;
+  fila.querySelector('button').onclick = () => { fila.remove(); pintarPrevisto(); };
   $('filas').append(fila);
 }
 $('anadir').onclick = anadirFila;
+$('filas').oninput = pintarPrevisto;
 for (let i = 0; i < 3; i++) anadirFila();
+pintarPrevisto();
 
 $('empezar').onclick = () => {
-  puntos = [...document.querySelectorAll('.fila')]
-    .map((f) => ({ nombre: f.querySelector('input').value.trim(), tipo: f.querySelector('select').value }))
-    .filter((p) => p.nombre)
-    .map((p) => ({ ...p, presupuesto: TIPOS[p.tipo] * 60_000, usado: 0, tramos: [], aviso5: false, finDicho: 0 }));
+  puntos = leerFilas().map((p) => ({ ...p, presupuesto: TIPOS[p.tipo] * 60_000, usado: 0, tramos: [], aviso5: false, finDicho: 0 }));
   if (!puntos.length) return ($('estado').textContent = 'Escribe el orden del día');
   previsto = puntos.reduce((s, p) => s + TIPOS[p.tipo], 0);
   speechSynthesis.getVoices(); // las voces cargan en segundo plano: así están listas para el primer aviso
@@ -159,8 +324,8 @@ $('empezar').onclick = () => {
   });
   // «error» solo llega cuando el SDK se rinde: sin transcripción no hay avisos de la IA, y tiene que verse.
   grabacion.on('state_change', ({ new_state }) => {
-    $('estado').textContent = new_state === 'error' ? 'Se ha perdido la transcripción: pulsa «Terminar» y vuelve a empezar' : new_state;
-    $('estado').className = new_state === 'error' ? 'grave' : '';
+    $('estado').textContent = new_state === 'error' ? 'Se ha perdido la transcripción: pulsa «Terminar» y vuelve a empezar' : ESTADOS[new_state] ?? new_state;
+    $('estado').className = new_state === 'error' ? 'grave' : new_state;
   });
   grabacion.on('error', (e) => ($('estado').textContent = `Error: ${e.message}`));
   eventos = [];
@@ -171,9 +336,8 @@ $('empezar').onclick = () => {
   vueltaPendiente = divagarDesde = null;
   consultas = setInterval(comprobar, CADA_MS);
   reloj = setInterval(cadaSegundo, 1000);
-  for (const id of ['preparar', 'empezar']) $(id).hidden = true;
-  for (const id of ['erroneo', 'noAviso', 'terminar']) $(id).hidden = false;
-  $('resumen').textContent = '';
+  for (const id of ['preparar', 'empezar', 'fin']) $(id).hidden = true;
+  $('vivo').hidden = false;
   pintar();
 };
 
@@ -265,6 +429,7 @@ function cadaSegundo() {
 // Avisos de la IA: preaviso cancelable de 5 s y, si nadie cancela, voz.
 function avisar(tipo, tema, punto) {
   vueltaPendiente = divagarDesde = null;
+  destino = punto;
   evento = registrar(tipo, tema, 'preaviso');
   $('mensaje').textContent = {
     'vueltas': `Estáis dando vueltas a ${tema || 'lo mismo'}`,
@@ -289,6 +454,7 @@ function avisar(tipo, tema, punto) {
 function cerrarAviso(resultado) {
   clearInterval(preaviso);
   preaviso = null;
+  destino = 0;
   $('aviso').hidden = true;
   desde = Date.now();
   evento.resultado = resultado;
@@ -352,9 +518,14 @@ $('terminar').onclick = () => {
   deshacer = null;
   for (const id of ['texto', 'estado']) $(id).textContent = '';
   $('estado').className = '';
-  $('resumen').textContent = `Reunión terminada. Previsto: ${previsto} min · Real: ${((Date.now() - inicio) / 60000).toFixed(1)} min. Transcripción borrada.`;
-  for (const id of ['erroneo', 'noAviso', 'terminar']) $(id).hidden = true;
-  for (const id of ['preparar', 'empezar']) $(id).hidden = false;
+  const real = (Date.now() - inicio) / 60000, deIA = eventos.filter((e) => DE_IA.includes(e.tipo));
+  $('finPrevisto').textContent = `${previsto} min`;
+  $('finReal').textContent = minutos(real);
+  $('finDiferencia').textContent = `${minutos(Math.abs(real - previsto))} ${real <= previsto ? 'menos' : 'más'} de lo previsto`;
+  $('finAvisos').textContent = deIA.length;
+  $('finErroneos').textContent = `Marcados como erróneos: ${deIA.filter((e) => e.erroneo).length}`;
+  $('vivo').hidden = true;
+  for (const id of ['preparar', 'empezar', 'fin']) $(id).hidden = false;
   pintar();
 };
 

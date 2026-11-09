@@ -51,7 +51,8 @@ Cada caso indica su orden del día (de los 8 inventados al principio del fichero
 | Fichero | Qué hace |
 |---|---|
 | `index.html` | Página: configuración, captura, tiempos por punto, consultas cada 10 s, avisos con voz, registro y borrado al terminar |
-| `server.js` | Servidor local (solo 127.0.0.1): claves temporales de Soniox y consultas al detector |
+| `fonts/` | Tipografías de la página (DM Sans y Archivo, licencia SIL OFL 1.1, con su texto de licencia) |
+| `server.js` | Servidor local (solo 127.0.0.1): página, tipografías, claves temporales de Soniox y consultas al detector |
 | `detector.mjs` | Pregunta a Claude de qué punto se habla y si hay vueltas, y decide la acción |
 | `casos.json`, `eval.mjs` | Casos de prueba del detector y su medición |
 | `test/e2e.mjs` | Prueba de extremo a extremo con APIs simuladas |

@@ -298,3 +298,27 @@ Siguen sin una prueba que los proteja: el rearme de «quedan 5 minutos» y el co
   - Unos 2,36 $ en total, que son 2,73 $/h. En la primera reunión real fueron 1,97 $/h.
   - La entrada supone el 96 % del coste. De media, cada consulta manda 3.793 tokens, frente a 3.104 en la primera reunión.
 - **Abaratar, todavía no** (CPO, 9-nov, opción A): se hacen 2 o 3 reuniones más con Sonnet y sin caché, y se decide con esos datos. Descartado por ahora: la caché de prompt (B) y Haiku (C).
+
+## 2026-11-09
+
+### Diseño de la página (CPO)
+- **Aspecto nuevo para enseñarlo a los compañeros que lo usarán.** Se parte de una maqueta de cuatro pantallas (preparar, en directo, preaviso y terminada) hecha en un lienzo de Claude, fuera del repositorio.
+- **Colores del manual de marca de Laguinda, sin logotipo ni guinda** (CPO). Motivo: el proyecto es propio, no de Laguinda.
+- **Titulares en Archivo (ancha, peso 800) en lugar de Ginto Nord** (CPO, opción A). Descartado: usar Ginto Nord sin subirla, o consultar antes su licencia. Motivo: el repositorio es público y la licencia de Ginto Nord no se ha consultado. Texto corrido en DM Sans.
+- **Las tipografías se guardan en `fonts/`** (CPO, opción B). Descartado: cargarlas desde Google Fonts. Motivo: no sumar otro servicio externo al SDK de Soniox. Licencia de las dos: SIL Open Font License 1.1, leída el 9-nov en el fichero LICENSE de los paquetes npm `@fontsource-variable/dm-sans` y `@fontsource-variable/archivo` (versión 5.3.0), de donde salen los ficheros; el texto de cada licencia va junto a ellos.
+- **Añadidos respecto a la app anterior** (CPO, alcance B): barra de progreso del punto activo, tiempo previsto antes de empezar, número de avisos de la IA y de marcados como erróneos al terminar, diferencia entre previsto y real, y las marcas «sin cerrar» y «se habla de esto» en el orden del día mientras está abierto un preaviso de salto a otro punto.
+- **«Avisos de la IA» cuenta los preavisos de vueltas, otro punto y fuera del orden del día**, también los cancelados. No cuenta los avisos de tiempo ni los cambios de punto.
+
+### Técnicas
+- **Solo cambian `index.html` y dos rutas en `server.js`** para servir las tipografías. Sin dependencias nuevas.
+- **El tipo de punto sigue siendo un desplegable** · tres botones por fila, como en la maqueta · hace lo mismo con menos código.
+- **«Reunión terminada» es un bloque encima de la preparación de la siguiente reunión** · una pantalla aparte con «Preparar otra reunión» · no añade navegación.
+- **La lista de puntos y el registro conservan su texto** («Nombre · tipo · quedan 14:05»): los separadores van en el marcado y no se muestran. Motivo: las pruebas existentes siguen comprobando lo mismo.
+- **Las marcas «ahora», «sin cerrar» y «se habla de esto» las pone el CSS** según la clase del punto; no forman parte del texto.
+- **El estado de la escucha se muestra en español** (Escuchando, En pausa, Conectando, Reconectando); los demás estados del SDK salen tal cual.
+- **Los contadores de consultas y tokens se mantienen**, en pequeño bajo el registro. Motivo: hacen falta para la decisión de coste pendiente (9-nov).
+- **Verificación:**
+  - `npm test` pasa con las aserciones nuevas.
+  - Quitando uno a uno cinco de los añadidos (marcas del preaviso, barra, previsto antes de empezar, filtro de avisos de la IA y estado en español), la prueba falla en los cinco.
+  - Capturas en Chromium a 1.280 px, con Soniox, Claude y la voz simulados, de preparar, sin punto detectado, en directo, preaviso, alarma y terminada: las dos tipografías cargan.
+  - No comprobado: Chrome real con micrófono y voz, anchos de móvil, y el contraste del texto blanco sobre el botón rojo.

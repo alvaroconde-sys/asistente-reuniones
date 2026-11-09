@@ -115,8 +115,12 @@ assert.equal(await pagina.locator('.fila').count(), 4);
 await pagina.locator('.fila').nth(3).locator('button').click();
 assert.equal(await pagina.locator('.fila').count(), 3);
 await configurar([['Presupuesto', 'Small decisions'], ['Calendario', 'Big decisions'], ['Responsables', 'Save the world']]);
+assert.equal(await pagina.textContent('#previsto'), '105 min', 'el tiempo previsto se ve antes de empezar');
+assert.deepEqual(await pagina.locator('#previstoLista li').allTextContents(), ['Presupuesto15 min', 'Calendario30 min', 'Responsables60 min']);
 await pagina.check('#modoPrueba');
 await empezar();
+assert.equal(await visible('preparar'), false);
+assert.equal(await pagina.textContent('#puntoTiempo'), '', 'sin punto detectado no hay cuenta atrás');
 assert.deepEqual(await puntos(), [
   'Presupuesto · Small decisions · quedan 15:00',
   'Calendario · Big decisions · quedan 30:00',
@@ -133,6 +137,11 @@ await consultar({ punto: 1, cerrado: false, vueltas: false, tema: '' });
 assert.equal(await activo(), 'Presupuesto');
 assert.equal(await visible('aviso'), false);
 assert.match((await puntos())[0], /quedan 14:/);
+assert.equal(await pagina.textContent('#puntoTipo'), 'Punto 1 de 3 · Small decisions');
+assert.equal(await pagina.textContent('#puntoNombre'), 'Presupuesto');
+assert.match(await pagina.textContent('#puntoTiempo'), /^14:\d\d$/);
+const barra = () => pagina.evaluate(() => parseFloat(document.getElementById('puntoBarra').style.width));
+assert.ok((await barra()) > 0 && (await barra()) < 10, 'la barra refleja el tiempo consumido del punto');
 
 // 4. Tras un cambio automático se consulta en el siguiente salto. Vueltas necesita confirmación: una sola
 // detección no avisa; otra 30 s después sí, aunque en medio haya consultas sin vueltas. Preaviso sin
@@ -154,8 +163,11 @@ assert.deepEqual(await dicho(), []);
 // 5. Tras un aviso se espera al menos una ventana. Salto a otro punto sin cerrar: «Ir al punto 2» sin voz.
 assert.ok(await consultar({ punto: 2, cerrado: false, vueltas: false, tema: '' }) >= 3, 'tras un aviso debe esperar 30 s');
 assert.equal(await pagina.textContent('#mensaje'), 'Os habéis ido al punto 2 (Calendario) sin cerrar el punto 1');
+assert.match(await pagina.textContent('#puntos li.activo.sincerrar'), /^Presupuesto/, 'el punto abierto se marca «sin cerrar»');
+assert.match(await pagina.textContent('#puntos li.destino'), /^Calendario/, 'y se señala el punto del que se habla');
 await pagina.click('#irPunto');
 assert.equal(await activo(), 'Calendario');
+assert.equal(await pagina.locator('#puntos li.destino, #puntos li.sincerrar').count(), 0, 'las marcas se van con el preaviso');
 assert.deepEqual(await dicho(), []);
 
 // 6. Fuera del orden del día: se permite 1 minuto seguido (6 consultas: la primera cuenta desde la mitad
@@ -166,9 +178,9 @@ await avanzar(5_000);
 assert.equal(await visible('aviso'), false);
 assert.match(await pagina.getAttribute('body', 'class'), /alarma/);
 assert.deepEqual(await dicho(), [FRASES.fuera]);
-assert.equal(await pagina.textContent('#estado'), 'paused', 'mientras habla no escucha');
+assert.equal(await pagina.textContent('#estado'), 'En pausa', 'mientras habla no escucha');
 await avanzar(3_000);
-assert.equal(await pagina.textContent('#estado'), 'recording', 'al terminar de hablar vuelve a escuchar');
+assert.equal(await pagina.textContent('#estado'), 'Escuchando', 'al terminar de hablar vuelve a escuchar');
 await pagina.click('#erroneo'); // el aviso ya habló: se marca como erróneo
 
 // 7. Punto cerrado: cambio automático. Una respuesta inválida (punto inexistente) no hace nada.
@@ -217,7 +229,13 @@ assert.ok(porTipo('cambio de punto').entrada.ultimo, 'los cambios automáticos g
 await avanzar(2_000);
 assert.equal(await pagina.evaluate(() => fetch(window.ultimoBlob).then(() => 'en memoria', () => 'liberado')), 'liberado', 'la copia del fichero se libera');
 assert.equal(await pagina.textContent('#texto'), '');
-assert.match(await pagina.textContent('#resumen'), /^Reunión terminada\. Previsto: 105 min · Real: \d+\.\d min\. Transcripción borrada\.$/);
+assert.equal(await visible('vivo'), false);
+assert.match(await pagina.textContent('#fin'), /Reunión terminada\s+Transcripción borrada/);
+assert.equal(await pagina.textContent('#finPrevisto'), '105 min');
+assert.match(await pagina.textContent('#finReal'), /^\d+,\d min$/);
+assert.match(await pagina.textContent('#finDiferencia'), /^\d+,\d min menos de lo previsto$/);
+assert.equal(await pagina.textContent('#finAvisos'), '3', 'vueltas, otro punto y fuera del orden del día');
+assert.equal(await pagina.textContent('#finErroneos'), 'Marcados como erróneos: 1');
 const almacenado = await pagina.evaluate(async () => localStorage.length + sessionStorage.length + (await indexedDB.databases()).length);
 assert.equal(almacenado, 0);
 assert.equal((await eventos()).length, 6);
@@ -241,6 +259,8 @@ assert.deepEqual(await dicho(), [FRASES.cinco]);
 await avanzar(5 * 60_000);
 assert.deepEqual(await dicho(), [FRASES.cinco, FRASES.fin]);
 assert.match((await puntos())[0], /^Uno · Small decisions · \d+:\d\d de más$/);
+assert.equal(await barra(), 100, 'con el tiempo agotado la barra está llena');
+assert.equal(await pagina.textContent('#puntoEtiqueta'), 'de más');
 await avanzar(5 * 60_000);
 assert.deepEqual(await dicho(), [FRASES.cinco, FRASES.fin, FRASES.fin]);
 
@@ -284,7 +304,7 @@ assert.equal((await eventos()).at(-1), 'fuera del orden del día: el fútbol →
 
 await pagina.click('#terminar');
 await pagina.waitForSelector('#empezar:not([hidden])');
-assert.match(await pagina.textContent('#resumen'), /Previsto: 45 min/);
+assert.equal(await pagina.textContent('#finPrevisto'), '45 min');
 
 // ===== Reunión C: respuestas lentas y contadores =====
 await configurar([['Uno', 'Small decisions'], ['Dos', 'Small decisions'], ['Tres', 'Small decisions']]);
@@ -393,6 +413,7 @@ await pagina.waitForSelector('#empezar:not([hidden])');
 
 // 22. El servidor rechaza las peticiones POST que no vienen de la propia página.
 assert.equal((await fetchReal('http://127.0.0.1:3999/api/analizar', { method: 'POST', body: '{}' })).status, 403);
+for (const f of ['dm-sans', 'archivo']) assert.equal((await fetchReal(`http://127.0.0.1:3999/fonts/${f}.woff2`)).headers.get('content-type'), 'font/woff2');
 
 console.log(`Prueba superada: ${peticionesClaude.length} consultas; configuración, confirmación de vueltas, aviso erróneo, modo prueba, voz con escucha en pausa, tiempos por punto, traspaso al cerrar, respuestas caducadas, contadores, servidor y borrado comprobados.`);
 await navegador.close();
