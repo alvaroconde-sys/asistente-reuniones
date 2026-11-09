@@ -1,8 +1,9 @@
-// Servidor mínimo: sirve la página, crea claves temporales de Soniox y consulta el detector.
+// Servidor mínimo: sirve la página, crea claves temporales de Soniox, consulta el detector y pide el resumen.
 // No guarda ni registra el contenido de las reuniones.
 import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';
 import { analizar } from './detector.mjs';
+import { resumir } from './resumen.mjs';
 
 const { SONIOX_API_KEY, ANTHROPIC_API_KEY, SONIOX_REGION = '', PORT = 3000 } = process.env;
 if (!SONIOX_API_KEY || !ANTHROPIC_API_KEY) throw new Error('Faltan SONIOX_API_KEY o ANTHROPIC_API_KEY en .env');
@@ -27,6 +28,7 @@ const rutas = {
   },
 
   'POST /api/analizar': async (req) => json(await analizar(JSON.parse(await leer(req)))),
+  'POST /api/resumir': async (req) => json(await resumir(JSON.parse(await leer(req)))),
 };
 
 createServer(async (req, res) => {

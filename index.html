@@ -7,7 +7,7 @@
 <style>
   body { font: 18px/1.5 system-ui, sans-serif; max-width: 760px; margin: 2rem auto; padding: 0 16px; color: #1a1a1a; background: #fff; }
   body.alarma { background: #c62828; }
-  button, input, select { font: inherit; }
+  button, input, select, textarea { font: inherit; }
   button { padding: .6rem 1.4rem; border-radius: 8px; border: 1px solid #888; cursor: pointer; }
   fieldset { border: 1px solid #ccc; border-radius: 8px; }
   .fila { display: flex; flex-wrap: wrap; gap: .5rem; margin-bottom: .5rem; }
@@ -20,6 +20,7 @@
   #aviso { margin: 1rem 0; padding: 1.5rem; border-radius: 12px; background: #fff3cd; border: 3px solid #e65100; font-size: 1.4rem; }
   #aviso button { background: #e65100; color: #fff; border: 0; margin: .5rem .5rem 0 0; }
   #eventos, #contadores, #resumen { color: #555; font-size: .9rem; }
+  #textoInforme { width: 100%; box-sizing: border-box; padding: 1rem; border-radius: 8px; }
   #estado.grave { color: #c62828; font-weight: bold; font-size: 1.3rem; }
 </style>
 </head>
@@ -49,6 +50,17 @@
 <ul id="eventos"></ul>
 <p id="contadores"></p>
 <p id="resumen"></p>
+<div id="informe" hidden>
+  <h2>Resumen de la reunión</h2>
+  <p id="estadoInforme"></p>
+  <textarea id="textoInforme" rows="24"></textarea>
+  <p>
+    <button id="copiar">Copiar</button>
+    <button id="bajar">Descargar</button>
+    <button id="reintentar">Reintentar</button>
+    <button id="descartar">Descartar</button>
+  </p>
+</div>
 
 <script type="module">
 import { SonioxClient } from 'https://cdn.jsdelivr.net/npm/@soniox/client@2.4.0/dist/index.mjs';
@@ -73,6 +85,7 @@ const $ = (id) => document.getElementById(id);
 const li = (texto, props) => Object.assign(document.createElement('li'), { textContent: texto, ...props });
 let grabacion, consultas, reloj, preaviso, evento, inicio, desde, inicioPunto, vueltaPendiente = null, divagarDesde = null, ocupado = false, callado = false;
 let frases = [], puntos = [], activo = 0, eventos = [], previsto = 0, deshacer = null, version = 0; // version: sube con cada cambio de punto
+let pendiente = null; // orden del día y transcripción de la reunión terminada, mientras esperan su resumen
 const cuenta = { consultas: 0, errores: 0, tokensEntrada: 0, tokensSalida: 0 };
 
 const texto = (filtro) => frases.filter(filtro).map((f) => f.texto).join('');
@@ -165,7 +178,9 @@ $('empezar').onclick = () => {
   grabacion.on('error', (e) => ($('estado').textContent = `Error: ${e.message}`));
   eventos = [];
   activo = 0;
-  deshacer = null;
+  deshacer = pendiente = null; // una reunión nueva descarta el resumen de la anterior
+  $('informe').hidden = true;
+  $('textoInforme').value = '';
   for (const k in cuenta) cuenta[k] = 0;
   inicio = desde = inicioPunto = Date.now();
   vueltaPendiente = divagarDesde = null;
@@ -337,7 +352,8 @@ function decir(tipo) {
   speechSynthesis.speak(voz);
 }
 
-// Al terminar se borra la transcripción; quedan en pantalla el registro de avisos y los contadores.
+// Al terminar se pide el resumen y se borra la transcripción; quedan en pantalla el resumen, el registro de
+// avisos y los contadores.
 $('terminar').onclick = () => {
   clearInterval(consultas);
   clearInterval(reloj);
@@ -346,26 +362,63 @@ $('terminar').onclick = () => {
   const g = grabacion;
   grabacion = null;
   g.cancel(); // cierra al momento, también durante una reconexión; los resultados finales se borrarían igualmente
+  const transcripcion = texto(() => true).trim();
+  const duracion = `Previsto: ${previsto} min · Real: ${((Date.now() - inicio) / 60000).toFixed(1)} min`;
   frases = [];
-  if ($('modoPrueba').checked) descargar({ fecha: new Date().toISOString(), orden: puntos.map(({ nombre, tipo }) => ({ nombre, tipo })), eventos });
+  // Modo prueba: el fichero queda solo en el portátil; en la página se borran los textos tras descargarlo.
+  if ($('modoPrueba').checked) {
+    descargar('prueba-reunion', 'json', JSON.stringify({ fecha: new Date().toISOString(), orden: puntos.map(({ nombre, tipo }) => ({ nombre, tipo })), eventos }, null, 2));
+    for (const e of eventos) { delete e.entrada; delete e.respuesta; }
+  }
+  $('resumen').textContent = `Reunión terminada. ${duracion}.${transcripcion ? '' : ' Transcripción borrada.'}`;
+  if (transcripcion) {
+    const fecha = new Date().toLocaleString('es-ES', { dateStyle: 'long', timeStyle: 'short' });
+    pendiente = { orden: puntos.map((p) => p.nombre), transcripcion, cabecera: `Reunión del ${fecha} · ${duracion}` };
+    resumir();
+  }
   puntos = [];
   deshacer = null;
   for (const id of ['texto', 'estado']) $(id).textContent = '';
   $('estado').className = '';
-  $('resumen').textContent = `Reunión terminada. Previsto: ${previsto} min · Real: ${((Date.now() - inicio) / 60000).toFixed(1)} min. Transcripción borrada.`;
   for (const id of ['erroneo', 'noAviso', 'terminar']) $(id).hidden = true;
   for (const id of ['preparar', 'empezar']) $(id).hidden = false;
   pintar();
 };
 
-// Modo prueba: el fichero queda solo en el portátil; en la página se borran los textos tras descargarlo.
-function descargar(datos) {
+// Resumen: una consulta con la transcripción entera. La transcripción sale de la página cuando llega el resumen
+// o cuando el organizador la descarta; el resumen se puede corregir en pantalla antes de copiarlo o descargarlo.
+// Sus tokens se muestran aparte: no cuentan en los contadores del detector.
+async function resumir() {
+  const p = pendiente;
+  informe('Generando el resumen…');
+  try {
+    const r = await (await fetch('/api/resumir', { method: 'POST', body: JSON.stringify({ orden: p.orden, transcripcion: p.transcripcion }) })).json();
+    if (pendiente !== p) return; // descartado, o ya hay otra reunión en marcha
+    pendiente = null;
+    $('textoInforme').value = `${p.cabecera}\n\n${r.texto}`;
+    informe(`Transcripción borrada. Revisa el resumen antes de compartirlo: puedes corregirlo aquí. Consulta del resumen: ${r.uso.input_tokens} tokens de entrada · ${r.uso.output_tokens} de salida.`, 'listo');
+  } catch {
+    if (pendiente === p) informe('No se ha podido generar el resumen. La transcripción sigue en esta página hasta que reintentes o la descartes.', 'fallo');
+  }
+}
+
+function informe(mensaje, estado) {
+  $('informe').hidden = false;
+  $('estadoInforme').textContent = mensaje;
+  for (const id of ['textoInforme', 'copiar', 'bajar']) $(id).hidden = estado !== 'listo';
+  for (const id of ['reintentar', 'descartar']) $(id).hidden = estado !== 'fallo';
+}
+$('reintentar').onclick = resumir;
+$('descartar').onclick = () => { pendiente = null; informe('Transcripción borrada, sin resumen.'); };
+$('copiar').onclick = () => navigator.clipboard.writeText($('textoInforme').value);
+$('bajar').onclick = () => descargar('resumen-reunion', 'txt', $('textoInforme').value);
+
+function descargar(nombre, extension, contenido) {
   const a = document.createElement('a');
-  a.href = URL.createObjectURL(new Blob([JSON.stringify(datos, null, 2)], { type: 'application/json' }));
-  a.download = `prueba-reunion-${datos.fecha.slice(0, 16).replace(':', '')}.json`;
+  a.href = URL.createObjectURL(new Blob([contenido]));
+  a.download = `${nombre}-${new Date().toISOString().slice(0, 16).replace(':', '')}.${extension}`;
   a.click();
   setTimeout(() => URL.revokeObjectURL(a.href), 1000); // libera la copia en memoria cuando la descarga ya ha empezado
-  for (const e of eventos) { delete e.entrada; delete e.respuesta; }
 }
 </script>
 </body>

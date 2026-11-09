@@ -29,14 +29,10 @@ const FORMATO = {
   },
 };
 
-export async function analizar({ orden, activo, antes, ultimo }, config = POR_DEFECTO) {
-  const { output_config, ...modelo } = CONFIGS[config];
-  const contenido = [
-    `ORDEN DEL DÍA:\n${orden.map((p, i) => `${i + 1}. ${p}`).join('\n')}`,
-    `PUNTO ACTIVO: ${activo || 'ninguno todavía'}`,
-    `ANTERIOR:\n${antes || '(nada)'}`,
-    `ÚLTIMO TRAMO:\n${ultimo}`,
-  ].join('\n\n');
+export const ordenDelDia = (orden) => `ORDEN DEL DÍA:\n${orden.map((p, i) => `${i + 1}. ${p}`).join('\n')}`;
+
+// Consulta a Claude; devuelve el texto de la respuesta y los tokens usados.
+export async function claude(cuerpo) {
   const res = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: {
@@ -44,19 +40,30 @@ export async function analizar({ orden, activo, antes, ultimo }, config = POR_DE
       'anthropic-version': '2023-06-01',
       'content-type': 'application/json',
     },
-    body: JSON.stringify({
-      ...modelo,
-      max_tokens: 2000, // el razonamiento cuenta dentro de este límite: tiene que caber con la respuesta
-      output_config: { ...output_config, format: FORMATO },
-      system: INSTRUCCIONES,
-      messages: [{ role: 'user', content: contenido }],
-    }),
+    body: JSON.stringify(cuerpo),
   });
   if (!res.ok) throw new Error(`Claude ${res.status}: ${await res.text()}`);
   const datos = await res.json();
   // Una respuesta cortada o rechazada es un error, no un «no pasa nada».
   if (['max_tokens', 'refusal'].includes(datos.stop_reason)) throw new Error(`Respuesta incompleta: ${datos.stop_reason}`);
-  const r = JSON.parse(datos.content.find((b) => b.type === 'text').text);
+  return { texto: datos.content.find((b) => b.type === 'text').text, uso: datos.usage };
+}
+
+export async function analizar({ orden, activo, antes, ultimo }, config = POR_DEFECTO) {
+  const { output_config, ...modelo } = CONFIGS[config];
+  const { texto, uso } = await claude({
+    ...modelo,
+    max_tokens: 2000, // el razonamiento cuenta dentro de este límite: tiene que caber con la respuesta
+    output_config: { ...output_config, format: FORMATO },
+    system: INSTRUCCIONES,
+    messages: [{ role: 'user', content: [
+      ordenDelDia(orden),
+      `PUNTO ACTIVO: ${activo || 'ninguno todavía'}`,
+      `ANTERIOR:\n${antes || '(nada)'}`,
+      `ÚLTIMO TRAMO:\n${ultimo}`,
+    ].join('\n\n') }],
+  });
+  const r = JSON.parse(texto);
 
   const valido = Number.isInteger(r.punto) && r.punto >= 0 && r.punto <= orden.length;
   const accion =
@@ -66,5 +73,5 @@ export async function analizar({ orden, activo, antes, ultimo }, config = POR_DE
     : r.vueltas ? 'vueltas'
     : 'nada';
   const tema = accion === 'cambio de punto' || accion === 'otro punto' ? orden[r.punto - 1] : r.tema;
-  return { accion, punto: valido ? r.punto : activo, tema, uso: datos.usage };
+  return { accion, punto: valido ? r.punto : activo, tema, uso };
 }

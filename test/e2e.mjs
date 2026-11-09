@@ -8,11 +8,21 @@ import assert from 'node:assert/strict';
 Object.assign(process.env, { SONIOX_API_KEY: 'prueba', ANTHROPIC_API_KEY: 'prueba', PORT: '3999' });
 const peticionesClaude = [];
 const respuestas = []; // lo que «contesta» Claude; sin respuesta preparada, sigue en el punto activo sin aviso
+const peticionesResumen = [];
+const resumenes = []; // lo que «contesta» Claude al pedir el resumen: { falla } o { retraso }; sin preparar, RESUMEN_SIMULADO
+const RESUMEN_SIMULADO = 'RESUMEN\nSe aprobó el presupuesto.';
 const fetchReal = globalThis.fetch;
 globalThis.fetch = async (url, opciones) => {
   if (String(url).startsWith('https://api.soniox.com/')) return Response.json({ api_key: 'temp:prueba' });
   if (String(url).startsWith('https://api.anthropic.com/')) {
     const cuerpo = JSON.parse(opciones.body);
+    if (!cuerpo.output_config.format) { // el resumen es la única consulta sin esquema JSON
+      peticionesResumen.push(cuerpo);
+      const { falla, retraso = 0 } = resumenes.shift() ?? {};
+      if (retraso) await new Promise((listo) => setTimeout(listo, retraso));
+      if (falla) return new Response('sobrecarga', { status: 529 });
+      return Response.json({ stop_reason: 'end_turn', content: [{ type: 'text', text: RESUMEN_SIMULADO }], usage: { input_tokens: 900, output_tokens: 80 } });
+    }
     peticionesClaude.push(cuerpo);
     const activo = Number(cuerpo.messages[0].content.match(/PUNTO ACTIVO: (\d+)/)?.[1] ?? 0);
     const { retraso = 0, ...r } = respuestas.shift() ?? { punto: activo, cerrado: false, vueltas: false, tema: '' };
@@ -202,6 +212,7 @@ assert.deepEqual(await eventos(), [
 
 // 10. Al terminar: modo prueba descarga el texto que vio la IA en cada aviso; previsto frente a real,
 // transcripción borrada, nada guardado en el navegador; el registro sigue en pantalla.
+resumenes.push({ falla: true });
 const [descarga] = await Promise.all([pagina.waitForEvent('download'), pagina.click('#terminar')]);
 await pagina.waitForSelector('#empezar:not([hidden])');
 assert.match(descarga.suggestedFilename(), /^prueba-reunion-\d{4}-\d{2}-\d{2}T\d{4}\.json$/);
@@ -217,10 +228,35 @@ assert.ok(porTipo('cambio de punto').entrada.ultimo, 'los cambios automáticos g
 await avanzar(2_000);
 assert.equal(await pagina.evaluate(() => fetch(window.ultimoBlob).then(() => 'en memoria', () => 'liberado')), 'liberado', 'la copia del fichero se libera');
 assert.equal(await pagina.textContent('#texto'), '');
-assert.match(await pagina.textContent('#resumen'), /^Reunión terminada\. Previsto: 105 min · Real: \d+\.\d min\. Transcripción borrada\.$/);
+assert.match(await pagina.textContent('#resumen'), /^Reunión terminada\. Previsto: 105 min · Real: \d+\.\d min\.$/);
 const almacenado = await pagina.evaluate(async () => localStorage.length + sessionStorage.length + (await indexedDB.databases()).length);
 assert.equal(almacenado, 0);
 assert.equal((await eventos()).length, 6);
+
+// 10b. Resumen: una consulta con el orden del día y la transcripción entera (todos los puntos). Si falla, la
+// transcripción se conserva para reintentar. El resumen se puede corregir, copiar y descargar; sus tokens
+// se muestran aparte.
+await pagina.waitForSelector('#reintentar:not([hidden])');
+assert.match(await pagina.textContent('#estadoInforme'), /^No se ha podido generar el resumen/);
+assert.equal(await visible('textoInforme'), false);
+await pagina.click('#reintentar');
+await pagina.waitForSelector('#textoInforme:not([hidden])');
+assert.equal(peticionesResumen.length, 2);
+const pedido = peticionesResumen[1];
+assert.deepEqual(pedido, peticionesResumen[0], 'el reintento manda lo mismo');
+assert.equal(pedido.model, 'claude-sonnet-5-5');
+assert.match(pedido.messages[0].content, /^ORDEN DEL DÍA:\n1\. Presupuesto\n2\. Calendario\n3\. Responsables\n\nTRANSCRIPCIÓN:\nBuenos días, empezamos\. Seguimos hablando/);
+assert.match(await pagina.inputValue('#textoInforme'), /^Reunión del .+ · Previsto: 105 min · Real: \d+\.\d min\n\nRESUMEN\nSe aprobó el presupuesto\.$/);
+assert.match(await pagina.textContent('#estadoInforme'), /^Transcripción borrada\. .* 900 tokens de entrada · 80 de salida\.$/);
+assert.equal(await visible('reintentar'), false);
+await pagina.fill('#textoInforme', 'Resumen corregido por el organizador');
+await pagina.context().grantPermissions(['clipboard-read', 'clipboard-write']);
+await pagina.click('#copiar');
+assert.equal(await pagina.evaluate(() => navigator.clipboard.readText()), 'Resumen corregido por el organizador');
+const [resumenBajado] = await Promise.all([pagina.waitForEvent('download'), pagina.click('#bajar')]);
+assert.match(resumenBajado.suggestedFilename(), /^resumen-reunion-\d{4}-\d{2}-\d{2}T\d{4}\.txt$/);
+assert.equal(await readFile(await resumenBajado.path(), 'utf8'), 'Resumen corregido por el organizador', 'se descarga lo corregido');
+await avanzar(2_000);
 
 // ===== Reunión B: tiempos =====
 await pagina.uncheck('#modoPrueba');
@@ -282,9 +318,16 @@ assert.equal(await visible('aviso'), false);
 assert.equal((await dicho()).length, antes);
 assert.equal((await eventos()).at(-1), 'fuera del orden del día: el fútbol → cancelado · erróneo');
 
+// 16b. Si el resumen falla y se descarta, la transcripción se borra y no se vuelve a pedir.
+resumenes.push({ falla: true });
 await pagina.click('#terminar');
 await pagina.waitForSelector('#empezar:not([hidden])');
 assert.match(await pagina.textContent('#resumen'), /Previsto: 45 min/);
+await pagina.click('#descartar');
+assert.equal(await pagina.textContent('#estadoInforme'), 'Transcripción borrada, sin resumen.');
+assert.equal(await visible('reintentar'), false);
+assert.equal(await visible('textoInforme'), false);
+assert.equal(peticionesResumen.length, 3);
 
 // ===== Reunión C: respuestas lentas y contadores =====
 await configurar([['Uno', 'Small decisions'], ['Dos', 'Small decisions'], ['Tres', 'Small decisions']]);
@@ -380,20 +423,29 @@ assert.match(peticionesClaude.at(-1).messages[0].content, /ANTERIOR:\nTexto inic
 assert.doesNotMatch(peticionesClaude.at(-1).messages[0].content, /Texto del punto dos/);
 
 // 21. Una respuesta lenta que llega después de «Terminar» y de empezar otra reunión no se aplica a la nueva.
+// Tampoco un resumen lento: empezar otra reunión descarta el de la anterior.
 await consultar({ punto: 3, cerrado: true, vueltas: false, tema: '', retraso: 3000 });
+resumenes.push({ retraso: 1500 });
 await pagina.click('#terminar');
 await pagina.waitForSelector('#empezar:not([hidden])');
+assert.equal(await pagina.textContent('#estadoInforme'), 'Generando el resumen…');
 await empezar();
 await pagina.waitForTimeout(3500);
 assert.equal(await pagina.locator('#puntos li.activo').count(), 0, 'la respuesta vieja no activa puntos');
 assert.deepEqual(await eventos(), []);
 assert.match(await pagina.textContent('#contadores'), /^consultas: 0 ·/);
+assert.equal(peticionesResumen.length, 4);
+assert.equal(await visible('informe'), false, 'el resumen de la reunión anterior no aparece en la nueva');
+// Una reunión sin nada transcrito no pide resumen.
 await pagina.click('#terminar');
 await pagina.waitForSelector('#empezar:not([hidden])');
+assert.match(await pagina.textContent('#resumen'), /Transcripción borrada\.$/);
+assert.equal(peticionesResumen.length, 4);
+assert.equal(await visible('informe'), false);
 
 // 22. El servidor rechaza las peticiones POST que no vienen de la propia página.
-assert.equal((await fetchReal('http://127.0.0.1:3999/api/analizar', { method: 'POST', body: '{}' })).status, 403);
+for (const ruta of ['analizar', 'resumir']) assert.equal((await fetchReal(`http://127.0.0.1:3999/api/${ruta}`, { method: 'POST', body: '{}' })).status, 403);
 
-console.log(`Prueba superada: ${peticionesClaude.length} consultas; configuración, confirmación de vueltas, aviso erróneo, modo prueba, voz con escucha en pausa, tiempos por punto, traspaso al cerrar, respuestas caducadas, contadores, servidor y borrado comprobados.`);
+console.log(`Prueba superada: ${peticionesClaude.length} consultas; configuración, confirmación de vueltas, aviso erróneo, modo prueba, voz con escucha en pausa, tiempos por punto, traspaso al cerrar, respuestas caducadas, contadores, resumen, servidor y borrado comprobados.`);
 await navegador.close();
 process.exit(0);

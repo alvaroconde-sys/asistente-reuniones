@@ -5,7 +5,7 @@ Asistente para guiar reuniones presenciales. Fase actual: **V1, prueba de concep
 - se salta a otro punto sin cerrar el actual (ofrece «Ir al punto X»);
 - se habla de algo que no está en el orden del día.
 
-Los avisos de la IA tienen un preaviso de 5 s en pantalla para cancelarlos; si nadie cancela, habla la voz. El de vueltas necesita confirmarse en dos consultas separadas 30 s; divagar se permite 1 minuto seguido. Mientras habla, la app deja de escuchar. Durante la reunión, «Este aviso es erróneo» marca el último aviso de la IA y «No ha avisado» apunta lo que se escapó. Con el **modo prueba** marcado (solo con el consentimiento de los asistentes), al terminar se descarga en el portátil un JSON con lo que vio la IA en cada aviso, para convertirlo en casos de prueba. Al terminar, la transcripción se borra; en pantalla queda el registro de avisos para revisar cuáles eran falsos.
+Los avisos de la IA tienen un preaviso de 5 s en pantalla para cancelarlos; si nadie cancela, habla la voz. El de vueltas necesita confirmarse en dos consultas separadas 30 s; divagar se permite 1 minuto seguido. Mientras habla, la app deja de escuchar. Durante la reunión, «Este aviso es erróneo» marca el último aviso de la IA y «No ha avisado» apunta lo que se escapó. Con el **modo prueba** marcado (solo con el consentimiento de los asistentes), al terminar se descarga en el portátil un JSON con lo que vio la IA en cada aviso, para convertirlo en casos de prueba. Al terminar, la app pide a la IA un **resumen de la reunión** con la transcripción entera: por cada punto del orden del día, las decisiones, las tareas (con responsable y plazo solo si se dijeron) y lo que quedó sin cerrar. El resumen sale en pantalla, se puede corregir ahí mismo y se copia o se descarga como `.txt`; la app no lo envía ni lo guarda. Cuando llega el resumen, la transcripción se borra; si la consulta falla, se conserva en la página hasta que se reintente o se descarte. Empezar otra reunión borra de la pantalla el resumen de la anterior. En pantalla queda también el registro de avisos, para revisar cuáles eran falsos.
 
 Decisiones y motivos: [DECISIONES.md](DECISIONES.md).
 
@@ -44,14 +44,15 @@ Cada caso indica su orden del día (de los 8 inventados al principio del fichero
 
 ## Pruebas (desarrollo)
 
-`npm install && npm test`: prueba de extremo a extremo en Chromium con micrófono falso, con Soniox, Claude y la voz simulados. No usa claves ni consume saldo. Si falla porque no encuentra Chromium, ejecuta antes `npx playwright install chromium`.
+`npm install && npm test`: prueba de extremo a extremo en Chromium con micrófono falso, con Soniox, Claude (detector y resumen) y la voz simulados. No usa claves ni consume saldo. Si falla porque no encuentra Chromium, ejecuta antes `npx playwright install chromium`.
 
 ## Ficheros
 
 | Fichero | Qué hace |
 |---|---|
-| `index.html` | Página: configuración, captura, tiempos por punto, consultas cada 10 s, avisos con voz, registro y borrado al terminar |
-| `server.js` | Servidor local (solo 127.0.0.1): claves temporales de Soniox y consultas al detector |
+| `index.html` | Página: configuración, captura, tiempos por punto, consultas cada 10 s, avisos con voz, registro, y resumen y borrado al terminar |
+| `server.js` | Servidor local (solo 127.0.0.1): claves temporales de Soniox, consultas al detector y resumen |
 | `detector.mjs` | Pregunta a Claude de qué punto se habla y si hay vueltas, y decide la acción |
+| `resumen.mjs` | Pide a Claude el resumen de la reunión: decisiones, tareas y asuntos sin cerrar por punto |
 | `casos.json`, `eval.mjs` | Casos de prueba del detector y su medición |
 | `test/e2e.mjs` | Prueba de extremo a extremo con APIs simuladas |

@@ -298,3 +298,25 @@ Siguen sin una prueba que los proteja: el rearme de «quedan 5 minutos» y el co
   - Unos 2,36 $ en total, que son 2,73 $/h. En la primera reunión real fueron 1,97 $/h.
   - La entrada supone el 96 % del coste. De media, cada consulta manda 3.793 tokens, frente a 3.104 en la primera reunión.
 - **Abaratar, todavía no** (CPO, 9-nov, opción A): se hacen 2 o 3 reuniones más con Sonnet y sin caché, y se decide con esos datos. Descartado por ahora: la caché de prompt (B) y Haiku (C).
+
+## 2026-11-09
+
+### Resumen de la reunión (CPO, 9-nov)
+- **Al terminar, la app genera un resumen** con las decisiones tomadas, las tareas y lo que quedó sin cerrar. Se adelanta de la V2, en paralelo a la medición del detector.
+- **Entrega: en pantalla, con «Copiar» y «Descargar»** (CPO, opción A). Descartados: un botón que abra el programa de correo (B) y que la app lo envíe por email (C). Motivo: respeta la decisión del 23-oct (la app no envía correos ni guarda direcciones) y no añade coste ni datos.
+- **Criterio de aceptación:** el CPO revisa el resumen tras cada reunión real e informa de los fallos (decisiones inventadas y decisiones que faltan). Sin umbral numérico todavía.
+- **Riesgos aceptados:**
+  - Sin diarización, el responsable de una tarea solo sale si se dice su nombre.
+  - Un error del resumen queda por escrito y se puede reenviar. Por eso es editable antes de compartirlo.
+  - Es lo primero que la app deja salir del contenido de la reunión: el consentimiento de los asistentes debería mencionarlo.
+
+### Técnicas
+- **Una sola consulta al terminar, con el orden del día y la transcripción entera** · resumir punto a punto durante la reunión · es una llamada en lugar de varias, y la página ya tiene toda la transcripción hasta «Terminar». No se manda qué punto estaba activo en cada momento: lo deduce el modelo.
+- **Mismo modelo y configuración que el detector** (Sonnet 5.5 sin pensar), con límite de 8.000 tokens de salida. Motivo: es la configuración ya probada contra la API real. **No comprobado con la API real:** ni la calidad del resumen ni su coste. La prueba simula a Claude.
+- **Texto plano con estructura fija** (resumen, y por punto: decisiones, tareas, sin cerrar) · salida estructurada en JSON · el destino es un cuadro de texto editable y un `.txt`; un JSON habría que volver a convertirlo en texto.
+- **Reglas del encargo al modelo:** solo lo que consta en la transcripción; decisión es lo acordado de forma expresa, y una propuesta sin aceptar va en «Sin cerrar»; responsable y plazo solo si se dijeron; lo que no se entiende bien se marca «(dudoso)»; sin juzgar a las personas ni sus emociones. Son hipótesis de IT hasta que el CPO revise resúmenes reales.
+- **La transcripción se borra de la página cuando llega el resumen.** Si la consulta falla, se conserva en memoria hasta «Reintentar» o «Descartar». Excepción acotada a «se borra al terminar»: sin ella, un fallo de red dejaría la reunión sin resumen. No sale del navegador salvo en la propia consulta.
+- **Empezar otra reunión descarta el resumen de la anterior**, también si aún se estaba generando. Riesgo: un clic en «Empezar reunión» antes de copiarlo o descargarlo lo pierde, y ya no se puede regenerar.
+- **Los tokens del resumen se muestran aparte** y no se suman a los contadores del detector. Motivo: no alterar el coste por hora que se está midiendo (decisión del 9-nov sobre abaratar).
+- **La llamada a la API de Claude pasa a una función común** (`claude()` en `detector.mjs`) que usan el detector y el resumen. El detector manda lo mismo que antes; `npm run eval` no se ha repetido tras el cambio.
+- **Verificación:** `npm test` comprueba lo que se manda (orden del día y transcripción de todos los puntos), el fallo con reintento, el descarte, la edición, «Copiar», «Descargar» (se descarga lo corregido), que un resumen lento no aparece en la reunión siguiente y que una reunión sin texto no pide resumen. Las pruebas del resumen caducado y del reintento se han visto fallar al quitar su protección.
