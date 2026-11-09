@@ -297,4 +297,4 @@ Siguen sin una prueba que los proteja: el rearme de «quedan 5 minutos» y el co
   - 298 consultas, 0 errores, 1.130.243 tokens de entrada y 9.859 de salida.
   - Unos 2,36 $ en total, que son 2,73 $/h. En la primera reunión real fueron 1,97 $/h.
   - La entrada supone el 96 % del coste. De media, cada consulta manda 3.793 tokens, frente a 3.104 en la primera reunión.
-- **Pendiente (CPO):** decidir si se abarata ya (caché de prompt o Haiku) o después de más reuniones.
+- **Abaratar, todavía no** (CPO, 9-nov, opción A): se hacen 2 o 3 reuniones más con Sonnet y sin caché, y se decide con esos datos. Descartado por ahora: la caché de prompt (B) y Haiku (C).
